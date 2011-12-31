@@ -22,6 +22,7 @@ testcb(evhtp_request_t * req, void * a) {
         /* BUG: When the SSL_VERIFY_FAIL_IF_NO_PEER_CERT is enforced, I still
                 get here. Clients see: curl: (35) error:14094410:SSL
                 routines:SSL3_READ_BYTES:sslv3 alert handshake failure */
+                /* Fix offered: https://github.com/ellzey/libevhtp/pull/29 */
 
         /* Need to have hostname to potentially compare dnsAltNames of the
          * peer's certificate when auth'ed from a machine */
