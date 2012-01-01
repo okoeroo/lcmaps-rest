@@ -48,4 +48,5 @@ lcmapsd_LDADD = \
     -lssl \
     -lcrypto \
     -levent_openssl \
-    -levhtp
+    -levhtp \
+    -llcmaps

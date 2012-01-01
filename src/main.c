@@ -6,17 +6,38 @@
 #include <stdio.h>
 #include <evhtp.h>
 
+#define LCMAPS_USE_DLOPEN
+#include <lcmaps/lcmaps_openssl.h>
+
+int lcmapsd_push_peer_certificate_to_chain(STACK_OF(X509) * chain, X509 * cert);
+void lcmapsd_cb(evhtp_request_t * req, void * a);
+evhtp_res my_accept_cb(evhtp_connection_t * conn, void * arg);
+
 
 int lcmapsd_push_peer_certificate_to_chain(STACK_OF(X509) * chain,
                                            X509 * cert) {
-
+    printf("Push peer certificate into the chain\n");
+    return sk_X509_insert(chain, cert, 0);;
 }
+
+/*
+Modes:
+    Full SSL    :   Push the credentials to map in LCMAPS through SSL
+    SSL+HTTP    :   Connect with SSL, but push credentials in the HTTP headers
+    HTTP        :   Push credentials with HTTP headers
+ */
 
 void
 lcmapsd_cb(evhtp_request_t * req, void * a) {
-    int i = 0;
-    STACK_OF (X509) * px509_chain = NULL;
-    X509 *            px509       = NULL;
+    STACK_OF (X509) *px509_chain = NULL;
+    X509            *px509       = NULL;
+
+    uid_t            uid;
+    gid_t *          pgid_list;
+    int              npgid;
+    gid_t *          sgid_list;
+    int              nsgid;
+    char *           poolindexp;
 
     printf("lcmaps_cb on the URI: \"/lcmaps\"\n");
     if (req->conn->ssl) {
@@ -33,30 +54,27 @@ lcmapsd_cb(evhtp_request_t * req, void * a) {
          * peer's certificate when auth'ed from a machine */
 
         printf("Got SSL enabled link\n");
-        /* Get certificate chain */
-        px509_chain = SSL_get_peer_cert_chain(req->conn->ssl);
-        if (!px509_chain) {
-            printf("No peer cert chain\n");
-        } else {
-            /* Push certificates in chain into the BIO memory stack */
-            for (i = 0; i < sk_X509_num(px509_chain); i++)  {
-                px509 = sk_X509_value(px509_chain, i);
-                if (px509) {
-                    X509_NAME_oneline(X509_get_subject_name(px509), tmp_dn, 256);
-                    printf("Depth level %i: Subject DN: %s\n", i, tmp_dn); 
-                }
-            }
-        }
+
         /* Get only the peer certificate, not the chain */
         px509 = SSL_get_peer_certificate(req->conn->ssl);
-        if (px509) {
-            X509_NAME_oneline(X509_get_subject_name(px509), tmp_dn, 256);
-            printf("Subject DN: %s\n", tmp_dn); 
+        if (!px509) {
+            printf("No peer certificate. Full SSL is impossible\n");
+            evhtp_send_reply(req, EVHTP_RES_IAMATEAPOT);
+            return;
         }
 
-        /* Add the peer certificate to the chain, because I want a complete chain */
-        sk_X509_insert(px509_chain, px509, 0);
+        /* Get certificate chain */
+        px509_chain = SSL_get_peer_cert_chain(req->conn->ssl);
 
+        if (!px509_chain) {
+            /* Create a certificate chain */
+            px509_chain = sk_X509_new(px509); /* Needs clean up! */
+        } else {
+            /* Add the peer certificate to the chain, because I want a complete chain */
+            lcmapsd_push_peer_certificate_to_chain(px509_chain, px509);
+        }
+
+#ifdef DEBUG
         /* And again */
         if (!px509_chain) {
             printf("No peer cert chain\n");
@@ -70,10 +88,30 @@ lcmapsd_cb(evhtp_request_t * req, void * a) {
                 }
             }
         }
+#endif /* DEBUG */
+
+#if 1
+        /* Got to LCMAPS */
+        lcmaps_init(NULL);
+        lcmaps_run_with_stack_of_x509_and_return_account(px509_chain,
+                                                         -1,
+                                                         NULL,
+                                                         0,
+                                                         NULL,
+                                                         &uid,
+                                                         &pgid_list,
+                                                         &npgid,
+                                                         &sgid_list,
+                                                         &nsgid,
+                                                         &poolindexp);
+        lcmaps_term();
+#endif
+
     }
 
     evbuffer_add_reference(req->buffer_out, "foobar", 6, NULL, NULL);
     evhtp_send_reply(req, EVHTP_RES_OK);
+    return;
 }
 
 static int
@@ -156,6 +194,15 @@ main(int argc, char ** argv) {
             .scache_del         = NULL,
     };
 
+#if 0
+    void * lcmaps_handle = dlopen("liblcmaps.dylib");
+    if (!lcmaps_handle) {
+        printf ("handle not found, gtfo\n");
+    } else {
+        printf ("handle found!\n");
+    }
+#endif
+
     evhtp_ssl_init(htp, &scfg);
 
     srand((unsigned)time(NULL));
@@ -165,6 +212,7 @@ main(int argc, char ** argv) {
     evhtp_set_cb(htp, "/lcmaps", lcmapsd_cb, NULL);
     evhtp_bind_socket(htp, "0.0.0.0", 8008, 1024);
     event_base_loop(evbase, 0);
+
     return 0;
 }
 
