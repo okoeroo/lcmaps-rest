@@ -23,13 +23,14 @@ void
 lcmapsd_fullssl_cb(evhtp_request_t * req, void * a) {
     STACK_OF (X509) *px509_chain = NULL;
     X509            *px509       = NULL;
+    int              i           = 0;
 
-    uid_t            uid;
-    gid_t *          pgid_list;
-    int              npgid;
-    gid_t *          sgid_list;
-    int              nsgid;
-    char *           poolindexp;
+    uid_t            uid         = -1;
+    gid_t *          pgid_list   = NULL;
+    int              npgid       = 0;
+    gid_t *          sgid_list   = NULL;
+    int              nsgid       = 0;
+    char *           poolindexp  = 0;
 
     printf("lcmapsd_fullssl_cb on the URI: \"/lcmaps/ssl\"\n");
     if (req->conn->ssl) {
@@ -98,7 +99,20 @@ lcmapsd_fullssl_cb(evhtp_request_t * req, void * a) {
         lcmaps_term();
     }
 
-    evbuffer_add_reference(req->buffer_out, "foobar", 6, NULL, NULL);
+    /* Construct message body */
+    evbuffer_add_printf(req->buffer_out, "<html><body>");
+    evbuffer_add_printf(req->buffer_out, "uid: %d<br>\n", uid);
+    for (i = 0; i < npgid; i++) {
+        evbuffer_add_printf(req->buffer_out, "gid: %d<br>\n", pgid_list[i]);
+    }
+    for (i = 0; i < nsgid; i++) {
+        evbuffer_add_printf(req->buffer_out, "secondary gid: %d<br>\n", sgid_list[i]);
+    }
+    if (poolindexp) {
+        evbuffer_add_printf(req->buffer_out, "poolindex: %s\n", poolindexp);
+    }
+    evbuffer_add_printf(req->buffer_out, "</body></html>");
+
     evhtp_send_reply(req, EVHTP_RES_OK);
     return;
 }
