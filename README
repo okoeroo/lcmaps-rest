@@ -1,0 +1,41 @@
+==============================================================================
+ __        ______ .___  ___.      ___      .______     _______.        
+|  |      /      ||   \/   |     /   \     |   _  \   /       |        
+|  |     |  ,----'|  \  /  |    /  ^  \    |  |_)  | |   (----` ______ 
+|  |     |  |     |  |\/|  |   /  /_\  \   |   ___/   \   \    |______|
+|  `----.|  `----.|  |  |  |  /  _____  \  |  |   .----)   |           
+|_______| \______||__|  |__| /__/     \__\ | _|   |_______/            
+                                                                       
+.______       _______     _______.___________.
+|   _  \     |   ____|   /       |           |
+|  |_)  |    |  |__     |   (----`---|  |----`
+|      /     |   __|     \   \       |  |     
+|  |\  \----.|  |____.----)   |      |  |     
+| _| `._____||_______|_______/       |__|     
+                                              
+
+==============================================================================
+
+
+Description:    a REST-API to LCMAPS
+Purpose:        Provide Unix account mappings based on input credentials
+                Currently LCMAPS is focussed on X.509 based credentials, 
+                including RFC3820 and old-style proxy certificates.
+Author:         Oscar Koeroo, okoeroo at gmail () com
+
+Run-modes:
+    Full SSL    :   Push the credentials to map in LCMAPS through SSL
+    SSL+HTTP    :   Connect with SSL, push credentials in the HTTP headers
+    HTTP        :   Push credentials with HTTP headers
+
+LICENCE:        Apache 2 licence
+
+
+Dependencies:
+    libevhtp    :   https://github.com/ellzey/libevhtp
+                    requires: libevent2, OpenSSL
+    lcmaps      :   http://software.nikhef.nl/security/lcmaps/
+                    requires: OpenSSL (using its OpenSSL interface)
+
+
+API:    To be developed.
