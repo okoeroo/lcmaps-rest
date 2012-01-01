@@ -47,6 +47,23 @@ testcb(evhtp_request_t * req, void * a) {
             X509_NAME_oneline(X509_get_subject_name(px509), tmp_dn, 256);
             printf("Subject DN: %s\n", tmp_dn); 
         }
+
+        /* Add the peer certificate to the chain, because I want a complete chain */
+        sk_X509_insert(px509_chain, px509, 0);
+
+        /* And again */
+        if (!px509_chain) {
+            printf("No peer cert chain\n");
+        } else {
+            /* Push certificates in chain into the BIO memory stack */
+            for (i = 0; i < sk_X509_num(px509_chain); i++)  {
+                px509 = sk_X509_value(px509_chain, i);
+                if (px509) {
+                    X509_NAME_oneline(X509_get_subject_name(px509), tmp_dn, 256);
+                    printf("Depth level %i: Subject DN: %s\n", i, tmp_dn); 
+                }
+            }
+        }
     }
 
     evbuffer_add_reference(req->buffer_out, "foobar", 6, NULL, NULL);
