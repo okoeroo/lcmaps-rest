@@ -6,14 +6,19 @@
 #include <stdio.h>
 #include <evhtp.h>
 
+
+int lcmapsd_push_peer_certificate_to_chain(STACK_OF(X509) * chain,
+                                           X509 * cert) {
+
+}
+
 void
-testcb(evhtp_request_t * req, void * a) {
+lcmapsd_cb(evhtp_request_t * req, void * a) {
     int i = 0;
     STACK_OF (X509) * px509_chain = NULL;
     X509 *            px509       = NULL;
-    char              tmp_dn[256];
 
-    printf("testcb on the URI: \"/lcmaps\"\n");
+    printf("lcmaps_cb on the URI: \"/lcmaps\"\n");
     if (req->conn->ssl) {
         /* BUG: Still connected after SSL failed. 
                 Example: wrong certificate purpose on the server side (using a
@@ -26,6 +31,7 @@ testcb(evhtp_request_t * req, void * a) {
 
         /* Need to have hostname to potentially compare dnsAltNames of the
          * peer's certificate when auth'ed from a machine */
+
         printf("Got SSL enabled link\n");
         /* Get certificate chain */
         px509_chain = SSL_get_peer_cert_chain(req->conn->ssl);
@@ -139,7 +145,7 @@ main(int argc, char ** argv) {
 
     evhtp_set_post_accept_cb(htp, my_accept_cb, NULL);
 
-    evhtp_set_cb(htp, "/lcmaps", testcb, NULL);
+    evhtp_set_cb(htp, "/lcmaps", lcmapsd_cb, NULL);
     evhtp_bind_socket(htp, "0.0.0.0", 8008, 1024);
     event_base_loop(evbase, 0);
     return 0;
