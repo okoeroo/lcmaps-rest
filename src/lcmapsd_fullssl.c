@@ -20,14 +20,14 @@ static int lcmapsd_push_peer_certificate_to_chain(STACK_OF(X509) * chain,
 }
 
 static int
-lcmapsd_construct_mapping_in_html(struct evbuffer * buf,
+lcmapsd_construct_mapping_in_html(struct evbuffer *buf,
                                   uid_t            uid,
                                   gid_t *          pgid_list,
                                   int              npgid,
                                   gid_t *          sgid_list,
                                   int              nsgid,
                                   char *           poolindex) {
-    int              i           = 0;
+    int i = 0;
 
     /* Construct message body */
     evbuffer_add_printf(buf, "<html><body>");
@@ -69,17 +69,57 @@ The same text expressed as XML:
   </popup>
 </menu>
 #endif
+static int
+lcmapsd_construct_mapping_in_xml(struct evbuffer * buf,
+                                 uid_t             uid,
+                                 gid_t *           pgid_list,
+                                 int               npgid,
+                                 gid_t *           sgid_list,
+                                 int               nsgid,
+                                 char *            poolindex) {
+    int i = 0;
+
+    /* Construct message body */
+    evbuffer_add_printf(buf, "<!DOCTYPE glossary PUBLIC \"-//OASIS//DTD DocBook V3.1//EN\">\n");
+    evbuffer_add_printf(buf, "<lcmaps>\n");
+    evbuffer_add_printf(buf, "  <mapping>\n");
+    evbuffer_add_printf(buf, "    <posix>\n");
+    evbuffer_add_printf(buf, "      <uid>\n");
+    evbuffer_add_printf(buf, "        <id>%d</id>\n", uid);
+    evbuffer_add_printf(buf, "      </uid>\n");
+    if (npgid > 0) {
+        evbuffer_add_printf(buf, "      <pgid>\n");
+        evbuffer_add_printf(buf, "        <id>%d</id>\n", pgid_list[0]);
+        evbuffer_add_printf(buf, "      </pgid>\n");
+    }
+    if (nsgid > 0) {
+        evbuffer_add_printf(buf, "      <sgid>\n");
+        evbuffer_add_printf(buf, "        <array>\n");
+        for (i = 0; i < nsgid; i++) {
+            evbuffer_add_printf(buf, "          <id>%d</id>\n", sgid_list[i]);
+        }
+        evbuffer_add_printf(buf, "        </array>\n");
+        evbuffer_add_printf(buf, "      </sgid>\n");
+    }
+    evbuffer_add_printf(buf, "    </posix>\n");
+    if (poolindex) {
+        evbuffer_add_printf(buf, "    <poolindex>%s</poolindex>\n", poolindex);
+    }
+    evbuffer_add_printf(buf, "  </mapping>\n");
+    evbuffer_add_printf(buf, "</lcmaps>\n");
+    return 0;
+}
 
 
 static int
-lcmapsd_construct_mapping_in_json(struct evbuffer * buf,
+lcmapsd_construct_mapping_in_json(struct evbuffer *buf,
                                   uid_t            uid,
                                   gid_t *          pgid_list,
                                   int              npgid,
                                   gid_t *          sgid_list,
                                   int              nsgid,
                                   char *           poolindex) {
-    int              i           = 0;
+    int i = 0;
 
     /* Construct message body */
     evbuffer_add_printf(buf, "{\"lcmaps\": {\n");
@@ -152,6 +192,7 @@ lcmapsd_perform_lcmaps(evhtp_request_t * req, STACK_OF(X509) * chain) {
     /* Construct message body */
     lcmapsd_construct_mapping_in_html(req->buffer_out, uid, pgid_list, npgid, sgid_list, nsgid, poolindexp);
     lcmapsd_construct_mapping_in_json(req->buffer_out, uid, pgid_list, npgid, sgid_list, nsgid, poolindexp);
+    lcmapsd_construct_mapping_in_xml(req->buffer_out, uid, pgid_list, npgid, sgid_list, nsgid, poolindexp);
 
     free(pgid_list);
     free(sgid_list);
