@@ -9,7 +9,7 @@
 #include <lcmaps/lcmaps_openssl.h>
 #include "lcmapsd_fullssl.h"
 
-#define LCMAPSD_URI_FULLSSL  "/lcmaps/ssl"
+#define LCMAPSD_URI_FULLSSL  "/lcmaps/mapping/ssl"
 
 
 static int lcmapsd_push_peer_certificate_to_chain(STACK_OF(X509) * chain, X509 * cert);
@@ -30,7 +30,7 @@ lcmapsd_construct_mapping_in_html(struct evbuffer *buf,
     int i = 0;
 
     /* Construct message body */
-    evbuffer_add_printf(buf, "<html><body>");
+    evbuffer_add_printf(buf, "<html><body>\n");
     evbuffer_add_printf(buf, "uid: %d<br>\n", uid);
     for (i = 0; i < npgid; i++) {
         evbuffer_add_printf(buf, "gid: %d<br>\n", pgid_list[i]);
@@ -46,29 +46,6 @@ lcmapsd_construct_mapping_in_html(struct evbuffer *buf,
     return 0;
 }
 
-
-#if 0
-{"menu": {
-  "id": "file",
-  "value": "File",
-  "popup": {
-    "menuitem": [
-      {"value": "New", "onclick": "CreateNewDoc()"},
-      {"value": "Open", "onclick": "OpenDoc()"},
-      {"value": "Close", "onclick": "CloseDoc()"}
-    ]
-  }
-}}
-The same text expressed as XML:
-
-<menu id="file" value="File">
-  <popup>
-    <menuitem value="New" onclick="CreateNewDoc()" />
-    <menuitem value="Open" onclick="OpenDoc()" />
-    <menuitem value="Close" onclick="CloseDoc()" />
-  </popup>
-</menu>
-#endif
 static int
 lcmapsd_construct_mapping_in_xml(struct evbuffer * buf,
                                  uid_t             uid,
@@ -149,25 +126,31 @@ lcmapsd_construct_mapping_in_json(struct evbuffer *buf,
 
 static evhtp_res
 lcmapsd_perform_lcmaps(evhtp_request_t * req, STACK_OF(X509) * chain) {
+    evhtp_res        resp_code   = 0;
     uid_t            uid         = -1;
     gid_t *          pgid_list   = NULL;
     int              npgid       = 0;
     gid_t *          sgid_list   = NULL;
     int              nsgid       = 0;
     char *           poolindexp  = NULL;
-    int              res         = 0;
+    int              lcmaps_res  = 0;
+    const char *     format      = NULL;
 
+    /* No chain, no game */
     if (!chain) {
-        return EVHTP_RES_UNAUTH; /* 401 */
+        resp_code = EVHTP_RES_UNAUTH; /* 401 */
+        goto end;
     }
 
     /* Go to LCMAPS */
     if (lcmaps_init(NULL) != 0) {
         /* Unable to initialize LCMAPS, have a look at the config file and
          * logfile */
-        return EVHTP_RES_SERVUNAVAIL; /* 503 */
+        resp_code = EVHTP_RES_SERVUNAVAIL; /* 503 */
+        goto end;
     }
-    res = lcmaps_run_with_stack_of_x509_and_return_account(
+
+    lcmaps_res = lcmaps_run_with_stack_of_x509_and_return_account(
                 chain,
                 -1,
                 NULL,
@@ -179,25 +162,41 @@ lcmapsd_perform_lcmaps(evhtp_request_t * req, STACK_OF(X509) * chain) {
                 &sgid_list,
                 &nsgid,
                 &poolindexp);
-    if (res != 0) {
-        return EVHTP_RES_FORBIDDEN; /* 403 */
+    if (lcmaps_res != 0) {
+        resp_code = EVHTP_RES_FORBIDDEN; /* 403 */
+        goto end;
     }
     if (lcmaps_term() != 0) {
         /* Could not tierdown LCMAPS */
-        return EVHTP_RES_SERVERR; /* 500 */
+        resp_code = EVHTP_RES_SERVERR; /* 500 */
+        goto end;
     }
 
-    poolindexp = strdup("mypoolindex");
-
     /* Construct message body */
-    lcmapsd_construct_mapping_in_html(req->buffer_out, uid, pgid_list, npgid, sgid_list, nsgid, poolindexp);
-    lcmapsd_construct_mapping_in_json(req->buffer_out, uid, pgid_list, npgid, sgid_list, nsgid, poolindexp);
-    lcmapsd_construct_mapping_in_xml(req->buffer_out, uid, pgid_list, npgid, sgid_list, nsgid, poolindexp);
+    format = evhtp_kv_find(req->uri->query, "format");
+    if (format) {
+        if (strcasecmp("json", format) == 0) {
+            lcmapsd_construct_mapping_in_json(req->buffer_out, uid, pgid_list, npgid, sgid_list, nsgid, poolindexp);
+        } else if (strcasecmp("xml", format) == 0) {
+            lcmapsd_construct_mapping_in_xml(req->buffer_out, uid, pgid_list, npgid, sgid_list, nsgid, poolindexp);
+        } else if (strcasecmp("html", format) == 0) {
+            lcmapsd_construct_mapping_in_html(req->buffer_out, uid, pgid_list, npgid, sgid_list, nsgid, poolindexp);
+        } else {
+            /* Fail, unsupported format */
+            resp_code = EVHTP_RES_BADREQ; /* 400 */
+            goto end;
+        }
+    } else {
+        /* Default response in JSON */
+        lcmapsd_construct_mapping_in_json(req->buffer_out, uid, pgid_list, npgid, sgid_list, nsgid, poolindexp);
+    }
+    resp_code = EVHTP_RES_OK; /* 200 */
 
+end:
     free(pgid_list);
     free(sgid_list);
 
-    return EVHTP_RES_OK; /* 200 */
+    return resp_code;
 }
 
 void
