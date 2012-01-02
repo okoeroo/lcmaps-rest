@@ -47,6 +47,66 @@ lcmapsd_construct_mapping_in_html(struct evbuffer * buf,
 }
 
 
+#if 0
+{"menu": {
+  "id": "file",
+  "value": "File",
+  "popup": {
+    "menuitem": [
+      {"value": "New", "onclick": "CreateNewDoc()"},
+      {"value": "Open", "onclick": "OpenDoc()"},
+      {"value": "Close", "onclick": "CloseDoc()"}
+    ]
+  }
+}}
+The same text expressed as XML:
+
+<menu id="file" value="File">
+  <popup>
+    <menuitem value="New" onclick="CreateNewDoc()" />
+    <menuitem value="Open" onclick="OpenDoc()" />
+    <menuitem value="Close" onclick="CloseDoc()" />
+  </popup>
+</menu>
+#endif
+
+
+static int
+lcmapsd_construct_mapping_in_json(struct evbuffer * buf,
+                                  uid_t            uid,
+                                  gid_t *          pgid_list,
+                                  int              npgid,
+                                  gid_t *          sgid_list,
+                                  int              nsgid,
+                                  char *           poolindex) {
+    int              i           = 0;
+
+    /* Construct message body */
+    evbuffer_add_printf(buf, "{\"lcmaps\": {\n");
+    evbuffer_add_printf(buf, "    \"mapping\": {\n");
+    evbuffer_add_printf(buf, "        \"posix\": {\n");
+    evbuffer_add_printf(buf, "            \"uid\": { \"id\": %d }%s\n", uid, npgid || nsgid ? "," : "");
+    if (npgid > 0) {
+    evbuffer_add_printf(buf, "            \"pgid\": { \"id\": %d }%s\n", pgid_list[0], nsgid ? "," : "");
+    }
+    evbuffer_add_printf(buf, "            \"sgid\": [\n");
+    for (i = 0; i < nsgid; i++) {
+        evbuffer_add_printf(buf, "                { \"id\": %d }%s\n", sgid_list[i], (i + 1) < nsgid ? "," : "" );
+    }
+    evbuffer_add_printf(buf, "                    ]\n");
+
+    evbuffer_add_printf(buf, "            }%s\n", poolindex ? "," : "");
+    if (poolindex) {
+        evbuffer_add_printf(buf, "        \"poolindex\": \"%s\"\n", poolindex);
+    }
+    evbuffer_add_printf(buf, "        }\n");
+    evbuffer_add_printf(buf, "    }\n");
+    evbuffer_add_printf(buf, "}\n");
+
+    return 0;
+}
+
+
 static evhtp_res
 lcmapsd_perform_lcmaps(evhtp_request_t * req, STACK_OF(X509) * chain) {
     uid_t            uid         = -1;
@@ -87,9 +147,11 @@ lcmapsd_perform_lcmaps(evhtp_request_t * req, STACK_OF(X509) * chain) {
         return EVHTP_RES_SERVERR; /* 500 */
     }
 
+    poolindexp = strdup("mypoolindex");
 
     /* Construct message body */
     lcmapsd_construct_mapping_in_html(req->buffer_out, uid, pgid_list, npgid, sgid_list, nsgid, poolindexp);
+    lcmapsd_construct_mapping_in_json(req->buffer_out, uid, pgid_list, npgid, sgid_list, nsgid, poolindexp);
 
     free(pgid_list);
     free(sgid_list);
