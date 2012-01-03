@@ -10,7 +10,7 @@
 
 #include <lcmaps/lcmaps_openssl.h>
 
-#include "common_callbacks.h"
+#include "lcmapsd_common.h"
 #include "lcmapsd_fullssl.h"
 
 

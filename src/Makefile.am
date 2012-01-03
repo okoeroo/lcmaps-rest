@@ -38,10 +38,10 @@ AM_CPPFLAGS = \
 sbin_PROGRAMS = lcmapsd
 
 lcmapsd_SOURCES = \
+        lcmapsd_common.h \
+        lcmapsd_common.c \
         lcmapsd_fullssl.h \
         lcmapsd_fullssl.c \
-        common_callbacks.h \
-        common_callbacks.c \
         main.c
 
 lcmapsd_CFLAGS = ${EXTRACOMPILEFLAGS}
