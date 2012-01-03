@@ -55,7 +55,25 @@ my_accept_cb(evhtp_connection_t * conn, void * arg) {
     return EVHTP_RES_200; /* misleading, has nothing to do with HTTP level codes, it chops the connection if !=200 */
 }
 
+int
+lcmapsd_construct_error_reply_in_html(struct evbuffer *buf,
+                                      const char * title,
+                                      const char * body_fmt,
+                                      ...) {
+    va_list ap;
 
+    evbuffer_add_printf(buf, "<html><head><title>%s</title></head><body>\n", PACKAGE_NAME);
+    if (title) {
+        evbuffer_add_printf(buf, "<h1>%s: %s</h1>\n", PACKAGE_NAME, title);
+    }
+    if (body_fmt) {
+        va_start(ap, body_fmt);
+        evbuffer_add_vprintf(buf, body_fmt, ap);
+        va_end(ap);
+    }
+    evbuffer_add_printf(buf, "\n</body></html>\n");
+    return 0;
+}
 
 int
 lcmapsd_construct_mapping_in_html(struct evbuffer *buf,

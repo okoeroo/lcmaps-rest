@@ -18,12 +18,11 @@
 
 
 static int lcmapsd_push_peer_certificate_to_chain(STACK_OF(X509) * chain, X509 * cert);
+static evhtp_res lcmapsd_perform_lcmaps(evhtp_request_t *, STACK_OF(X509) *);
 
 static int lcmapsd_push_peer_certificate_to_chain(STACK_OF(X509) * chain, X509 * cert) {
     return sk_X509_insert(chain, cert, 0);;
 }
-
-
 
 static evhtp_res
 lcmapsd_perform_lcmaps(evhtp_request_t * req, STACK_OF(X509) * chain) {
@@ -84,6 +83,11 @@ lcmapsd_perform_lcmaps(evhtp_request_t * req, STACK_OF(X509) * chain) {
             lcmapsd_construct_mapping_in_html(req->buffer_out, uid, pgid_list, npgid, sgid_list, nsgid, poolindexp);
         } else {
             /* Fail, unsupported format */
+            lcmapsd_construct_error_reply_in_html(req->buffer_out,
+                                                  "Wrong format value",
+                                                  "The format \"%s\" is not supported. Use json, xml or " \
+                                                  "html. Leave it out of the query for the default in JSON.",
+                                                  format);
             resp_code = EVHTP_RES_BADREQ; /* 400 */
             goto end;
         }
