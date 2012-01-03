@@ -207,7 +207,7 @@ lcmapsd_fullssl_cb(evhtp_request_t * req, void * a) {
     X509            *px509       = NULL;
     evhtp_res        lcmaps_res  = 0;
 
-    printf("lcmapsd_fullssl_cb on the URI: \"" LCMAPSD_URI_FULLSSL "\"\n");
+    printf("lcmapsd_fullssl_cb on the URI: \"" LCMAPSD_FULLSSL_URI "\"\n");
     if (!req) {
         printf("No request object! - problem in evhtp/libevent\n");
         return;
