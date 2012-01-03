@@ -38,7 +38,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.57)
-AC_INIT([REST LCMAPS daemon], [0.0.1], okoeroo@gmail.com)
+AC_INIT([LCMAPS REST Daemon], [0.0.1], okoeroo@gmail.com)
 AC_CONFIG_MACRO_DIR([autodir])
 AM_INIT_AUTOMAKE([1.6.3 subdir-objects foreign])
 AC_CONFIG_SRCDIR([src/lcmapsd.h.in])
