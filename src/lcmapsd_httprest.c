@@ -96,10 +96,16 @@ lcmapsd_perform_lcmaps_from_uri(evhtp_request_t * req) {
     if (format) {
         if (strcasecmp("json", format) == 0) {
             lcmapsd_construct_mapping_in_json(req->buffer_out, uid, pgid_list, npgid, sgid_list, nsgid, poolindexp);
+            evhtp_headers_add_header(req->headers_out,
+                                     evhtp_header_new("Content-Type", "application/json", 0, 0));
         } else if (strcasecmp("xml", format) == 0) {
             lcmapsd_construct_mapping_in_xml(req->buffer_out, uid, pgid_list, npgid, sgid_list, nsgid, poolindexp);
+            evhtp_headers_add_header(req->headers_out,
+                                     evhtp_header_new("Content-Type", "text/xml", 0, 0));
         } else if (strcasecmp("html", format) == 0) {
             lcmapsd_construct_mapping_in_html(req->buffer_out, uid, pgid_list, npgid, sgid_list, nsgid, poolindexp);
+            evhtp_headers_add_header(req->headers_out,
+                                     evhtp_header_new("Content-Type", "text/html", 0, 0));
         } else {
             /* Fail, unsupported format */
             lcmapsd_construct_error_reply_in_html(req->buffer_out,
@@ -113,6 +119,8 @@ lcmapsd_perform_lcmaps_from_uri(evhtp_request_t * req) {
     } else {
         /* Default response in JSON */
         lcmapsd_construct_mapping_in_json(req->buffer_out, uid, pgid_list, npgid, sgid_list, nsgid, poolindexp);
+        evhtp_headers_add_header(req->headers_out,
+                                 evhtp_header_new("Content-Type", "application/json", 0, 0));
     }
     resp_code = EVHTP_RES_OK; /* 200 */
 

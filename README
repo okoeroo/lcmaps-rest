@@ -35,6 +35,7 @@ Dependencies:
                     requires: libevent2, OpenSSL
     lcmaps      :   http://software.nikhef.nl/security/lcmaps/
                     requires: OpenSSL (using its OpenSSL interface)
+                    More info: http://www.nikhef.nl/pub/projects/grid/gridwiki/index.php/LCMAPS
 
 Listening:
     8443 - The Full SSL-based interfaces listen on port 8443
@@ -65,66 +66,71 @@ Queries specific to the "/lcmaps/mapping/rest" URI:
                                   and role affiliations.
                             FQANs MUST be combined with a subjectdn=
 
-Sample output JSON:
-{"lcmaps": {
-    "mapping": {
-        "posix": {
-            "uid": { "id": 501 },
-            "pgid": { "id": 501 },
-            "sgid": [
-                { "id": 31 },
-                { "id": 32 },
-                { "id": 79 },
-                { "id": 80 },
-                { "id": 81 },
-                { "id": 402 },
-                { "id": 403 },
-                { "id": 507 }
-                    ]
+JSON output:
+    Content-Type: application/json
+    Sample output JSON:
+        {"lcmaps": {
+            "mapping": {
+                "posix": {
+                    "uid": { "id": 501 },
+                    "pgid": { "id": 501 },
+                    "sgid": [
+                        { "id": 31 },
+                        { "id": 32 },
+                        { "id": 79 },
+                        { "id": 80 },
+                        { "id": 81 },
+                        { "id": 402 },
+                        { "id": 403 },
+                        { "id": 507 }
+                            ]
+                    }
+                }
             }
         }
-    }
-}
 
-Sample output XML:
-<!DOCTYPE glossary PUBLIC "-//OASIS//DTD DocBook V3.1//EN">
-<lcmaps>
-  <mapping>
-    <posix>
-      <uid>
-        <id>501</id>
-      </uid>
-      <pgid>
-        <id>501</id>
-      </pgid>
-      <sgid>
-        <array>
-          <id>31</id>
-          <id>32</id>
-          <id>79</id>
-          <id>80</id>
-          <id>81</id>
-          <id>402</id>
-          <id>403</id>
-          <id>507</id>
-        </array>
-      </sgid>
-    </posix>
-  </mapping>
-</lcmaps>
+XML output:
+    Content-Type: text/xml
+    Sample output XML:
+        <!DOCTYPE glossary PUBLIC "-//OASIS//DTD DocBook V3.1//EN">
+        <lcmaps>
+          <mapping>
+            <posix>
+              <uid>
+                <id>501</id>
+              </uid>
+              <pgid>
+                <id>501</id>
+              </pgid>
+              <sgid>
+                <array>
+                  <id>31</id>
+                  <id>32</id>
+                  <id>79</id>
+                  <id>80</id>
+                  <id>81</id>
+                  <id>402</id>
+                  <id>403</id>
+                  <id>507</id>
+                </array>
+              </sgid>
+            </posix>
+          </mapping>
+        </lcmaps>
 
-Sample output HTML (tentative to change):
-<html><body>
-uid: 501<br>
-gid: 501<br>
-secondary gid: 31<br>
-secondary gid: 32<br>
-secondary gid: 79<br>
-secondary gid: 80<br>
-secondary gid: 81<br>
-secondary gid: 402<br>
-secondary gid: 403<br>
-secondary gid: 507<br>
-</body></html>
+HTML output:
+    Content-Type: text/html
+    Sample output HTML (tentative to change):
+        <html><body>
+        uid: 501<br>
+        gid: 501<br>
+        secondary gid: 31<br>
+        secondary gid: 32<br>
+        secondary gid: 79<br>
+        secondary gid: 80<br>
+        secondary gid: 81<br>
+        secondary gid: 402<br>
+        secondary gid: 403<br>
+        secondary gid: 507<br>
+        </body></html>
 
-    
