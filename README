@@ -38,9 +38,16 @@ Dependencies:
                     requires: OpenSSL (using its OpenSSL interface)
 
 Listening:
-    The SSL-based interfaces will listen on port 8443
-    The unsecured interfaces will listen on port 8008
-
+    The Full SSL-based interfaces listen on port 8443
+        The expected input is a client certificate (chain) will feature classic
+        and RFC3820 proxy certificate support.
+    The session SSL-based interfaces listen on port 7443
+        The expected input is the same as the plain-HTTP interfaces, being REST
+        based using the query featured name/value pairs.
+    The plain-HTTP (unsecured, but fast) interfaces listen on port 8008
+        The expected input is REST based, meaning that the query featured
+        name/value pairs are used for input. See below for details.
+        
 URI:
     https://localhost:8443/lcmaps/mapping/ssl
     https://localhost:8443/lcmaps/mapping/rest
@@ -53,10 +60,11 @@ Queries for all URI:
     ?format=html        :   Mapping output in HTML
     
 Queries specific to the "/lcmaps/mapping/rest" URI:
-    ?subjectdn=<value>  :   URL encoded (X.509) Subject DN
-    ?fqan=<value>       :   VOMS FQANs.
-                            Add FQANs multiple times
-                            Must be combined with a subjectdn=
+    ?subjectdn=<value>  :   URL encoded (X.509) Subject DN.
+    ?fqan=<value>       :   URL encoded VOMS FQANs.
+                            Note: Add FQANs multiple times for mulitple group
+                                  and role affiliations.
+                            FQANs MUST be combined with a subjectdn=
 
 Sample output JSON:
 {"lcmaps": {

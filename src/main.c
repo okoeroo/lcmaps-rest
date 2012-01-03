@@ -32,6 +32,7 @@ main(int argc, char ** argv) {
     /* evhtp_set_post_accept_cb(htp, my_accept_cb, NULL); */
 
     /* register callbacks and such */
+
     lcmapsd_fullssl_init(evbase);
     lcmapsd_httprest_init(evbase);
     event_base_loop(evbase, 0);

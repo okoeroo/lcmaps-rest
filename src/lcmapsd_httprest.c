@@ -17,7 +17,7 @@
 
 #define LCMAPSD_SSLHTTP_URI         LCMAPSD_HTTP_URI
 #define LCMAPSD_SSLHTTP_BIND_IP     LCMAPSD_HTTP_BIND_IP
-#define LCMAPSD_SSLHTTP_BIND_PORT   8443
+#define LCMAPSD_SSLHTTP_BIND_PORT   7443
 #define LCMAPSD_SSLHTTP_LISTENERS   LCMAPSD_HTTP_LISTENERS
 
 
@@ -170,10 +170,22 @@ lcmapsd_httprest_init(evbase_t * evbase) {
 
     evhtp_ssl_init(ssl_htp, &scfg);
     evhtp_set_cb(ssl_htp, LCMAPSD_SSLHTTP_URI, lcmapsd_httprest_cb, NULL);
-    evhtp_bind_socket(ssl_htp, LCMAPSD_SSLHTTP_BIND_IP, LCMAPSD_SSLHTTP_BIND_PORT, LCMAPSD_SSLHTTP_LISTENERS);
+    if (evhtp_bind_socket(ssl_htp, LCMAPSD_SSLHTTP_BIND_IP, LCMAPSD_SSLHTTP_BIND_PORT, LCMAPSD_SSLHTTP_LISTENERS) != 0) {
+        printf("Error: couldn't bind the socket for the URI \"%s\" using SSL on IP \"%s\" and port \"%d\" with %d listeners\n",
+                LCMAPSD_SSLHTTP_URI,
+                LCMAPSD_SSLHTTP_BIND_IP,
+                LCMAPSD_SSLHTTP_BIND_PORT,
+                LCMAPSD_SSLHTTP_LISTENERS);
+    }
 
     evhtp_set_cb(nonssl_htp, LCMAPSD_HTTP_URI, lcmapsd_httprest_cb, NULL);
-    evhtp_bind_socket(nonssl_htp, LCMAPSD_HTTP_BIND_IP, LCMAPSD_HTTP_BIND_PORT, LCMAPSD_HTTP_LISTENERS);
+    if (evhtp_bind_socket(nonssl_htp, LCMAPSD_HTTP_BIND_IP, LCMAPSD_HTTP_BIND_PORT, LCMAPSD_HTTP_LISTENERS) != 0) {
+        printf("Error: couldn't bind the socket for the URI \"%s\" without SSL on IP \"%s\" and port \"%d\" with %d listeners\n",
+                LCMAPSD_HTTP_URI,
+                LCMAPSD_HTTP_BIND_IP,
+                LCMAPSD_HTTP_BIND_PORT,
+                LCMAPSD_HTTP_LISTENERS);
+    }
     return 0;
 }
 
