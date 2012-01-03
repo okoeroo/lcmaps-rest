@@ -37,19 +37,19 @@ Dependencies:
                     requires: OpenSSL (using its OpenSSL interface)
 
 Listening:
-    The Full SSL-based interfaces listen on port 8443
+    8443 - The Full SSL-based interfaces listen on port 8443
         The expected input is a client certificate (chain) will feature classic
         and RFC3820 proxy certificate support.
-    The session SSL-based interfaces listen on port 7443
+    7443 - The session SSL-based interfaces listen on port 7443
         The expected input is the same as the plain-HTTP interfaces, being REST
         based using the query featured name/value pairs.
-    The plain-HTTP (unsecured, but fast) interfaces listen on port 8008
+    8008 - The plain-HTTP (unsecured, but fast) interfaces listen on port 8008
         The expected input is REST based, meaning that the query featured
         name/value pairs are used for input. See below for details.
         
 URI:
     https://localhost:8443/lcmaps/mapping/ssl
-    https://localhost:8443/lcmaps/mapping/rest
+    https://localhost:7443/lcmaps/mapping/rest
     https://localhost:8008/lcmaps/mapping/rest
 
 Queries for all URI:
