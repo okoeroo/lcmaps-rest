@@ -1,5 +1,40 @@
 #include "lcmapsd_common.h"
 
+int
+lcmapsd_select_return_format(evhtp_request_t *req) {
+    const char * format   = NULL;
+    const char * accept_h = NULL;
+
+    /* Search the parsed query string for the "?format=" tag */
+    if ((format = evhtp_kv_find(req->uri->query, "format"))) {
+        if (strcasecmp("json", format) == 0) {
+            return TYPE_JSON;
+        } else if (strcasecmp("xml", format) == 0) {
+            return TYPE_XML;
+        } else if (strcasecmp("html", format) == 0) {
+            return TYPE_HTML;
+        } else {
+            return TYPE_UNKNOWN;
+        }
+    }
+
+    /* Search the HTTP headers for the 'accept:' tag */
+    if ((accept_h = evhtp_header_find(req->headers_in, "accept"))) {
+        if (strcmp("application/json", accept_h) == 0) {
+            return TYPE_JSON;
+        } else if (strcmp("text/xml", accept_h) == 0) {
+            return TYPE_XML;
+        } else if (strcmp("text/html", accept_h) == 0) {
+            return TYPE_HTML;
+        } else if (strcmp("*/*", accept_h) == 0) {
+            return TYPE_JSON;
+        } else {
+            return TYPE_UNKNOWN;
+        }
+    }
+    /* The default answer is JSON */
+    return TYPE_JSON;
+}
 
 int
 dummy_ssl_verify_callback(int ok, X509_STORE_CTX * x509_store) {

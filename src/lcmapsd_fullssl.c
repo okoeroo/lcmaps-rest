@@ -35,7 +35,6 @@ lcmapsd_perform_lcmaps(evhtp_request_t * req, STACK_OF(X509) * chain) {
     int              nsgid       = 0;
     char *           poolindexp  = NULL;
     int              lcmaps_res  = 0;
-    const char *     format      = NULL;
 
     /* No chain, no game */
     if (!chain) {
@@ -74,35 +73,37 @@ lcmapsd_perform_lcmaps(evhtp_request_t * req, STACK_OF(X509) * chain) {
     }
 
     /* Construct message body */
-    format = evhtp_kv_find(req->uri->query, "format");
-    if (format) {
-        if (strcasecmp("json", format) == 0) {
-            lcmapsd_construct_mapping_in_json(req->buffer_out, uid, pgid_list, npgid, sgid_list, nsgid, poolindexp);
+    switch (lcmapsd_select_return_format(req)) {
+        case TYPE_JSON:
+            lcmapsd_construct_mapping_in_json(req->buffer_out,
+                                              uid, pgid_list, npgid, sgid_list, nsgid, poolindexp);
             evhtp_headers_add_header(req->headers_out,
                                      evhtp_header_new("Content-Type", "application/json", 0, 0));
-        } else if (strcasecmp("xml", format) == 0) {
-            lcmapsd_construct_mapping_in_xml(req->buffer_out, uid, pgid_list, npgid, sgid_list, nsgid, poolindexp);
+            break;
+        case TYPE_XML:
+            lcmapsd_construct_mapping_in_xml(req->buffer_out,
+                                             uid, pgid_list, npgid, sgid_list, nsgid, poolindexp);
             evhtp_headers_add_header(req->headers_out,
                                      evhtp_header_new("Content-Type", "text/xml", 0, 0));
-        } else if (strcasecmp("html", format) == 0) {
-            lcmapsd_construct_mapping_in_html(req->buffer_out, uid, pgid_list, npgid, sgid_list, nsgid, poolindexp);
+            break;
+        case TYPE_HTML:
+            lcmapsd_construct_mapping_in_html(req->buffer_out,
+                                              uid, pgid_list, npgid, sgid_list, nsgid, poolindexp);
             evhtp_headers_add_header(req->headers_out,
                                      evhtp_header_new("Content-Type", "text/html", 0, 0));
-        } else {
+            break;
+        default:
             /* Fail, unsupported format */
             lcmapsd_construct_error_reply_in_html(req->buffer_out,
-                                                  "Wrong format value",
-                                                  "The format \"%s\" is not supported. Use json, xml or " \
-                                                  "html. Leave it out of the query for the default in JSON.",
-                                                  format);
+                                                  "Wrong format query or accept header value",
+                                                  "The value in the format query or accept header value " \
+                                                  "is not supported.<br>\n" \
+                                                  "In the ?format=<value> use the values: \"json\", \"xml\" " \
+                                                  "or \"html\", or leave the entire query out.<br>\n"
+                                                  "Or trust on the \"accept:\" HTTP headers to be set.<br>\n" \
+                                                  "Use \"application/json\", \"text/xml\", \"text/html\" or \"*/*\".");
             resp_code = EVHTP_RES_BADREQ; /* 400 */
             goto end;
-        }
-    } else {
-        /* Default response in JSON */
-        lcmapsd_construct_mapping_in_json(req->buffer_out, uid, pgid_list, npgid, sgid_list, nsgid, poolindexp);
-        evhtp_headers_add_header(req->headers_out,
-                                 evhtp_header_new("Content-Type", "application/json", 0, 0));
     }
     resp_code = EVHTP_RES_OK; /* 200 */
 
@@ -119,18 +120,26 @@ lcmapsd_fullssl_cb(evhtp_request_t * req, void * a) {
     X509            *px509       = NULL;
     evhtp_res        lcmaps_res  = 0;
 
+#ifdef DEBUG
     printf("lcmapsd_fullssl_cb on the URI: \"" LCMAPSD_FULLSSL_URI "\"\n");
+#endif
     if (!req) {
-        printf("No request object! - problem in evhtp/libevent\n");
+        syslog(LOG_ERR, "No request object! - problem in evhtp/libevent\n");
         return;
     }
     if (!req->conn) {
-        printf("No connection object in request object - problem in evhtp/libevent\n");
+        syslog(LOG_ERR, "No connection object in request object - problem in evhtp/libevent\n");
         return;
     }
     if (!req->conn->ssl) {
-        printf("No SSL object connection object - required for this URI\n");
+        syslog(LOG_ERR, "No SSL object connection object - required for this URI\n");
+        lcmapsd_construct_error_reply_in_html(req->buffer_out,
+                                              "No SSL initiated",
+                                              "The URI \"%s\" hosted on port %d is exclusively SSL.",
+                                              LCMAPSD_FULLSSL_URI,
+                                              LCMAPSD_FULLSSL_BIND_PORT);
         evhtp_send_reply(req, EVHTP_RES_METHNALLOWED); /* 405 */
+        return;
     }
 
 #ifdef DEBUG
@@ -153,6 +162,12 @@ lcmapsd_fullssl_cb(evhtp_request_t * req, void * a) {
     px509 = SSL_get_peer_certificate(req->conn->ssl);
     if (!px509) {
         printf("No peer certificate. Full SSL is impossible\n");
+        lcmapsd_construct_error_reply_in_html(req->buffer_out,
+                                              "No peer certificate provided",
+                                              "The URI \"%s\" hosted on port %d is exclusively SSL" \
+                                              "and requires a peer certificate (chain) to be provided.",
+                                              LCMAPSD_FULLSSL_URI,
+                                              LCMAPSD_FULLSSL_BIND_PORT);
         evhtp_send_reply(req, EVHTP_RES_UNAUTH); /* 401 */
         return;
     }

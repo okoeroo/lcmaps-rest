@@ -25,47 +25,6 @@ static evhtp_res lcmapsd_perform_lcmaps_from_uri(evhtp_request_t *);
 static void lcmapsd_httprest_cb(evhtp_request_t *, void *);
 
 
-#define TYPE_UNKNOWN    0
-#define TYPE_JSON       1
-#define TYPE_XML        2
-#define TYPE_HTML       3
-
-int
-lcmapsd_select_return_format(evhtp_request_t *req);
-
-int
-lcmapsd_select_return_format(evhtp_request_t *req) {
-    const char * format   = NULL;
-    const char * accept_h = NULL;
-
-    /* Search the parsed query string for the "?format=" tag */
-    if ((format = evhtp_kv_find(req->uri->query, "format"))) {
-        if (strcasecmp("json", format) == 0) {
-            return TYPE_JSON;
-        } else if (strcasecmp("xml", format) == 0) {
-            return TYPE_XML;
-        } else if (strcasecmp("html", format) == 0) {
-            return TYPE_HTML;
-        } else {
-            return TYPE_UNKNOWN;
-        }
-    }
-
-    /* Search the HTTP headers for the 'accept:' tag */
-    if ((accept_h = evhtp_header_find(req->headers_in, "accept"))) {
-        if (strcmp("application/json", accept_h) == 0) {
-            return TYPE_JSON;
-        } else if (strcmp("text/xml", accept_h) == 0) {
-            return TYPE_XML;
-        } else if (strcmp("text/html", accept_h) == 0) {
-            return TYPE_HTML;
-        }
-    }
-    /* The default answer is JSON */
-    return TYPE_JSON;
-}
-
-
 static evhtp_res
 lcmapsd_perform_lcmaps_from_uri(evhtp_request_t *req) {
     evhtp_res   resp_code   = EVHTP_RES_SERVERR;
@@ -96,7 +55,11 @@ lcmapsd_perform_lcmaps_from_uri(evhtp_request_t *req) {
     userdn = calloc(1, strlen(subjectdn) + 1); /* Encoded is always more then not encoded */
     if (evhtp_unescape_string((unsigned char **)&userdn, (unsigned char *)subjectdn, strlen(subjectdn)) != 0) {
         /* Unparseable */
-        printf ("Parse error\n");
+        lcmapsd_construct_error_reply_in_html(req->buffer_out,
+                                              "Parse error in ?subjectdn=<value>",
+                                              "Could not unescape the ?subjectdn=<value> value");
+        resp_code = EVHTP_RES_BADREQ; /* 400 */
+        goto end;
     }
 
     /* TODO: Add FQAN query parsing */
@@ -105,6 +68,11 @@ lcmapsd_perform_lcmaps_from_uri(evhtp_request_t *req) {
     if (lcmaps_init(NULL) != 0) {
         /* Unable to initialize LCMAPS, have a look at the config file and
          * logfile */
+        lcmapsd_construct_error_reply_in_html(req->buffer_out,
+                                              "LCMAPS initialization failure",
+                                              "Failure in initializing LCMAPS.<br>\n" \
+                                              "Could be: configuration file errors, " \
+                                              "plugins initialization error or system error");
         resp_code = EVHTP_RES_SERVUNAVAIL; /* 503 */
         goto end;
     }
@@ -122,11 +90,17 @@ lcmapsd_perform_lcmaps_from_uri(evhtp_request_t *req) {
                         &nsgid,
                         &poolindexp);
     if (lcmaps_res != 0) {
+        lcmapsd_construct_error_reply_in_html(req->buffer_out,
+                                              "LCMAPS mapping failure",
+                                              "Failure in mapping your provided credentials in LCMAPS");
         resp_code = EVHTP_RES_FORBIDDEN; /* 403 */
         goto end;
     }
     if (lcmaps_term() != 0) {
         /* Could not tierdown LCMAPS */
+        lcmapsd_construct_error_reply_in_html(req->buffer_out,
+                                              "LCMAPS termination failed",
+                                              "Failure detected when LCMAPS tried to terminate");
         resp_code = EVHTP_RES_SERVERR; /* 500 */
         goto end;
     }
@@ -154,9 +128,13 @@ lcmapsd_perform_lcmaps_from_uri(evhtp_request_t *req) {
         default:
             /* Fail, unsupported format */
             lcmapsd_construct_error_reply_in_html(req->buffer_out,
-                                                  "Wrong format value",
-                                                  "The format is not supported. Use json, xml or " \
-                                                  "html. Leave it out of the query for the default in JSON.");
+                                                  "Wrong format query or accept header value",
+                                                  "The value in the format query or accept header value " \
+                                                  "is not supported.<br>\n" \
+                                                  "In the ?format=<value> use the values: \"json\", \"xml\" " \
+                                                  "or \"html\", or leave the entire query out.<br>\n"
+                                                  "Or trust on the \"accept:\" HTTP headers to be set.<br>\n" \
+                                                  "Use \"application/json\", \"text/xml\", \"text/html\" or \"*/*\".");
             resp_code = EVHTP_RES_BADREQ; /* 400 */
             goto end;
     }
@@ -175,11 +153,11 @@ lcmapsd_httprest_cb(evhtp_request_t * req, void * a) {
 
     /* printf("%s on the URI: \"" LCMAPSD_HTTP_URI "\"\n", __func__); */
     if (!req) {
-        printf("No request object! - problem in evhtp/libevent\n");
+        syslog(LOG_ERR, "No request object! - problem in evhtp/libevent\n");
         return;
     }
     if (!req->conn) {
-        printf("No connection object in request object - problem in evhtp/libevent\n");
+        syslog(LOG_ERR, "No connection object in request object - problem in evhtp/libevent\n");
         return;
     }
 
