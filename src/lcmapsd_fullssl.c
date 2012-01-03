@@ -9,13 +9,15 @@
 #include <lcmaps/lcmaps_openssl.h>
 #include "lcmapsd_fullssl.h"
 
-#define LCMAPSD_URI_FULLSSL  "/lcmaps/mapping/ssl"
+#define LCMAPSD_FULLSSL_URI         "/lcmaps/mapping/ssl"
+#define LCMAPSD_FULLSSL_BIND_IP     "0.0.0.0"
+#define LCMAPSD_FULLSSL_BIND_PORT   8443
+#define LCMAPSD_FULLSSL_LISTENERS   1024
 
 
 static int lcmapsd_push_peer_certificate_to_chain(STACK_OF(X509) * chain, X509 * cert);
 
-static int lcmapsd_push_peer_certificate_to_chain(STACK_OF(X509) * chain,
-                                           X509 * cert) {
+static int lcmapsd_push_peer_certificate_to_chain(STACK_OF(X509) * chain, X509 * cert) {
     return sk_X509_insert(chain, cert, 0);;
 }
 
@@ -278,8 +280,33 @@ lcmapsd_fullssl_cb(evhtp_request_t * req, void * a) {
 }
 
 int
-lcmapsd_fullssl_init(evhtp_t * htp) {
-    evhtp_set_cb(htp, LCMAPSD_URI_FULLSSL, lcmapsd_fullssl_cb, NULL);
+lcmapsd_fullssl_init(evbase_t * evbase) {
+    evhtp_t  * htp    = evhtp_new(evbase, NULL);
+    evhtp_ssl_cfg_t scfg = {
+            .pemfile            = "/Users/okoeroo/dvl/certs/ca/test_localhost_with_subjectAltName/hostcert.pem",
+            .privfile           = "/Users/okoeroo/dvl/certs/ca/test_localhost_with_subjectAltName/hostkey.pem",
+            .cafile             = NULL,
+            .capath             = "/etc/grid-security/certificates/",
+            .ciphers            = "ALL:!ADH:!LOW:!EXP:@STRENGTH",
+            .ssl_opts           = SSL_OP_NO_SSLv2,
+            .verify_peer        = SSL_VERIFY_FAIL_IF_NO_PEER_CERT|SSL_VERIFY_PEER,
+            .verify_depth       = 42,
+            /* .x509_verify_cb     = dummy_ssl_verify_callback, */
+            /* .x509_chk_issued_cb = dummy_check_issued_cb, */
+            .x509_verify_cb     = NULL,
+            .x509_chk_issued_cb = NULL,
+            .scache_type        = evhtp_ssl_scache_type_internal,
+            .scache_size        = 1024,
+            .scache_timeout     = 1024,
+            .scache_init        = NULL,
+            .scache_add         = NULL,
+            .scache_get         = NULL,
+            .scache_del         = NULL,
+    };
+
+    evhtp_ssl_init(htp, &scfg);
+    evhtp_set_cb(htp, LCMAPSD_FULLSSL_URI, lcmapsd_fullssl_cb, NULL);
+    evhtp_bind_socket(htp, LCMAPSD_FULLSSL_BIND_IP, LCMAPSD_FULLSSL_BIND_PORT, LCMAPSD_FULLSSL_LISTENERS);
 
     return 0;
 }

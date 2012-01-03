@@ -14,7 +14,7 @@
     #define LCMAPSD_FULLSSL_H
 
 void lcmapsd_fullssl_cb(evhtp_request_t *, void *);
-int lcmapsd_fullssl_init(evhtp_t *);
+int lcmapsd_fullssl_init(evbase_t *);
 static evhtp_res lcmapsd_perform_lcmaps(evhtp_request_t *, STACK_OF(X509) *);
 
 #endif /* LCMAPSD_FULLSSL_H */
