@@ -26,5 +26,5 @@ ACLOCAL_AMFLAGS = -I autodir
 SUBDIRS = src
 
 EXTRA_DIST = \
-	bootstrap
+	autogen.sh
 
