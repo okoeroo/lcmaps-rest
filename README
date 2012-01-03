@@ -18,18 +18,17 @@
 
 
 Description:    a REST-API to LCMAPS
+Author:         Oscar Koeroo, okoeroo at gmail () com
+LICENCE:        Apache 2 licence
+
 Purpose:        Provide Unix account mappings based on input credentials
                 Currently LCMAPS is focussed on X.509 based credentials, 
                 including RFC3820 and old-style proxy certificates.
-Author:         Oscar Koeroo, okoeroo at gmail () com
 
 Run-modes:
     Full SSL    :   Push the credentials to map in LCMAPS through SSL
     SSL+HTTP    :   Connect with SSL, push credentials in the HTTP headers
     HTTP        :   Push credentials with HTTP headers
-
-LICENCE:        Apache 2 licence
-
 
 Dependencies:
     libevhtp    :   https://github.com/ellzey/libevhtp
