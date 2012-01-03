@@ -24,22 +24,62 @@
 static evhtp_res lcmapsd_perform_lcmaps_from_uri(evhtp_request_t *);
 static void lcmapsd_httprest_cb(evhtp_request_t *, void *);
 
+
+#define TYPE_UNKNOWN    0
+#define TYPE_JSON       1
+#define TYPE_XML        2
+#define TYPE_HTML       3
+
+int
+lcmapsd_select_return_format(evhtp_request_t *req);
+
+int
+lcmapsd_select_return_format(evhtp_request_t *req) {
+    const char * format   = NULL;
+    const char * accept_h = NULL;
+
+    /* Search the parsed query string for the "?format=" tag */
+    if ((format = evhtp_kv_find(req->uri->query, "format"))) {
+        if (strcasecmp("json", format) == 0) {
+            return TYPE_JSON;
+        } else if (strcasecmp("xml", format) == 0) {
+            return TYPE_XML;
+        } else if (strcasecmp("html", format) == 0) {
+            return TYPE_HTML;
+        } else {
+            return TYPE_UNKNOWN;
+        }
+    }
+
+    /* Search the HTTP headers for the 'accept:' tag */
+    if ((accept_h = evhtp_header_find(req->headers_in, "accept"))) {
+        if (strcmp("application/json", accept_h) == 0) {
+            return TYPE_JSON;
+        } else if (strcmp("text/xml", accept_h) == 0) {
+            return TYPE_XML;
+        } else if (strcmp("text/html", accept_h) == 0) {
+            return TYPE_HTML;
+        }
+    }
+    /* The default answer is JSON */
+    return TYPE_JSON;
+}
+
+
 static evhtp_res
-lcmapsd_perform_lcmaps_from_uri(evhtp_request_t * req) {
-    evhtp_res   resp_code   = 0;
+lcmapsd_perform_lcmaps_from_uri(evhtp_request_t *req) {
+    evhtp_res   resp_code   = EVHTP_RES_SERVERR;
     uid_t       uid         = -1;
-    gid_t *     pgid_list   = NULL;
+    gid_t      *pgid_list   = NULL;
     int         npgid       = 0;
-    gid_t *     sgid_list   = NULL;
+    gid_t      *sgid_list   = NULL;
     int         nsgid       = 0;
-    /* char *       poolindexp  = NULL; */
     int         lcmaps_res  = 0;
-    const char *format      = NULL;
     const char *subjectdn   = NULL;
-    unsigned char * userdn  = NULL;
-    char  **    fqans       = NULL;
+    char       *userdn  = NULL;
+    char      **fqans       = NULL;
     int         nfqan       = 0;
-    char *      poolindexp  = NULL;
+    char       *poolindexp  = NULL;
 
     /* Construct message body */
     subjectdn = evhtp_kv_find(req->uri->query, "subjectdn");
@@ -54,7 +94,7 @@ lcmapsd_perform_lcmaps_from_uri(evhtp_request_t * req) {
     }
 
     userdn = calloc(1, strlen(subjectdn) + 1); /* Encoded is always more then not encoded */
-    if (evhtp_unescape_string(&userdn, (unsigned char *)subjectdn, strlen(subjectdn)) != 0) {
+    if (evhtp_unescape_string((unsigned char **)&userdn, (unsigned char *)subjectdn, strlen(subjectdn)) != 0) {
         /* Unparseable */
         printf ("Parse error\n");
     }
@@ -92,35 +132,33 @@ lcmapsd_perform_lcmaps_from_uri(evhtp_request_t * req) {
     }
 
     /* Construct message body */
-    format = evhtp_kv_find(req->uri->query, "format");
-    if (format) {
-        if (strcasecmp("json", format) == 0) {
-            lcmapsd_construct_mapping_in_json(req->buffer_out, uid, pgid_list, npgid, sgid_list, nsgid, poolindexp);
+    switch (lcmapsd_select_return_format(req)) {
+        case TYPE_JSON:
+            lcmapsd_construct_mapping_in_json(req->buffer_out,
+                                              uid, pgid_list, npgid, sgid_list, nsgid, poolindexp);
             evhtp_headers_add_header(req->headers_out,
                                      evhtp_header_new("Content-Type", "application/json", 0, 0));
-        } else if (strcasecmp("xml", format) == 0) {
-            lcmapsd_construct_mapping_in_xml(req->buffer_out, uid, pgid_list, npgid, sgid_list, nsgid, poolindexp);
+            break;
+        case TYPE_XML:
+            lcmapsd_construct_mapping_in_xml(req->buffer_out,
+                                             uid, pgid_list, npgid, sgid_list, nsgid, poolindexp);
             evhtp_headers_add_header(req->headers_out,
                                      evhtp_header_new("Content-Type", "text/xml", 0, 0));
-        } else if (strcasecmp("html", format) == 0) {
-            lcmapsd_construct_mapping_in_html(req->buffer_out, uid, pgid_list, npgid, sgid_list, nsgid, poolindexp);
+            break;
+        case TYPE_HTML:
+            lcmapsd_construct_mapping_in_html(req->buffer_out, 
+                                              uid, pgid_list, npgid, sgid_list, nsgid, poolindexp);
             evhtp_headers_add_header(req->headers_out,
                                      evhtp_header_new("Content-Type", "text/html", 0, 0));
-        } else {
+            break;
+        default:
             /* Fail, unsupported format */
             lcmapsd_construct_error_reply_in_html(req->buffer_out,
                                                   "Wrong format value",
-                                                  "The format \"%s\" is not supported. Use json, xml or " \
-                                                  "html. Leave it out of the query for the default in JSON.",
-                                                  format);
+                                                  "The format is not supported. Use json, xml or " \
+                                                  "html. Leave it out of the query for the default in JSON.");
             resp_code = EVHTP_RES_BADREQ; /* 400 */
             goto end;
-        }
-    } else {
-        /* Default response in JSON */
-        lcmapsd_construct_mapping_in_json(req->buffer_out, uid, pgid_list, npgid, sgid_list, nsgid, poolindexp);
-        evhtp_headers_add_header(req->headers_out,
-                                 evhtp_header_new("Content-Type", "application/json", 0, 0));
     }
     resp_code = EVHTP_RES_OK; /* 200 */
 
