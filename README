@@ -53,7 +53,9 @@ Query in URI:
     ?format=html        :   Mapping output in HTML
     
     ?subjectdn=<value>  :   URL encoded (X.509) Subject DN
-    ?fqan=<value>       :   VOMS FQANs. Add multiple of these
+    ?fqan=<value>       :   VOMS FQANs.
+                            Add FQANs multiple times
+                            Must be combined with a subjectdn=
 
 Sample output JSON:
 {"lcmaps": {
