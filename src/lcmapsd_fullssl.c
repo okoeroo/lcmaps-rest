@@ -19,6 +19,7 @@
 
 static int lcmapsd_push_peer_certificate_to_chain(STACK_OF(X509) * chain, X509 * cert);
 static evhtp_res lcmapsd_perform_lcmaps(evhtp_request_t *, STACK_OF(X509) *);
+static void lcmapsd_fullssl_cb(evhtp_request_t *, void *);
 
 static int lcmapsd_push_peer_certificate_to_chain(STACK_OF(X509) * chain, X509 * cert) {
     return sk_X509_insert(chain, cert, 0);;
@@ -104,7 +105,7 @@ end:
     return resp_code;
 }
 
-void
+static void
 lcmapsd_fullssl_cb(evhtp_request_t * req, void * a) {
     STACK_OF (X509) *px509_chain = NULL;
     X509            *px509       = NULL;

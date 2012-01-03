@@ -42,6 +42,8 @@ lcmapsd_SOURCES = \
         lcmapsd_common.c \
         lcmapsd_fullssl.h \
         lcmapsd_fullssl.c \
+        lcmapsd_httprest.h \
+        lcmapsd_httprest.c \
         main.c
 
 lcmapsd_CFLAGS = ${EXTRACOMPILEFLAGS}

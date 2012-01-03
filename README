@@ -43,15 +43,16 @@ Listening:
 
 URI:
     https://localhost:8443/lcmaps/mapping/ssl
-    https://localhost:8443/lcmaps/mapping/http
-    https://localhost:8008/lcmaps/mapping/http
+    https://localhost:8443/lcmaps/mapping/rest
+    https://localhost:8008/lcmaps/mapping/rest
 
-Query in URI:
+Queries for all URI:
     ?format=json        :   Mapping output in JSON 
                             (JSON is the default when absent)
     ?format=xml         :   Mapping output in XML
     ?format=html        :   Mapping output in HTML
     
+Queries specific to the "/lcmaps/mapping/rest" URI:
     ?subjectdn=<value>  :   URL encoded (X.509) Subject DN
     ?fqan=<value>       :   VOMS FQANs.
                             Add FQANs multiple times

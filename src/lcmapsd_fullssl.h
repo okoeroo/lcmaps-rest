@@ -6,14 +6,12 @@
 #include <stdio.h>
 #include <evhtp.h>
 
-#define LCMAPS_USE_DLOPEN
 #include <lcmaps/lcmaps_openssl.h>
 
 
 #ifndef LCMAPSD_FULLSSL_H
     #define LCMAPSD_FULLSSL_H
 
-void lcmapsd_fullssl_cb(evhtp_request_t *, void *);
 int lcmapsd_fullssl_init(evbase_t *);
 
 #endif /* LCMAPSD_FULLSSL_H */

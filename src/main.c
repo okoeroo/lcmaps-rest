@@ -33,6 +33,7 @@ main(int argc, char ** argv) {
 
     /* register callbacks and such */
     lcmapsd_fullssl_init(evbase);
+    lcmapsd_httprest_init(evbase);
     event_base_loop(evbase, 0);
 
     closelog();
