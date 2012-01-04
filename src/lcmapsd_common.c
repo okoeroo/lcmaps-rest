@@ -1,5 +1,26 @@
 #include "lcmapsd_common.h"
 
+
+
+#if 0
+int
+evhtp_kvs_for_each(evhtp_kvs_t * kvs, evhtp_kvs_iterator cb, void * arg) {
+    evhtp_kv_t * kv;
+
+    TAILQ_FOREACH(kv, kvs, next) {
+        int res;
+
+        if ((res = cb(kv, arg))) {
+            return res;
+        }
+    }
+
+    return 0;
+}
+#endif
+
+
+
 int
 lcmapsd_select_return_format(evhtp_request_t *req) {
     const char * format   = NULL;
