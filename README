@@ -34,8 +34,8 @@ Dependencies:
     libevhtp    :   https://github.com/ellzey/libevhtp
                     requires: libevent2, OpenSSL
     lcmaps      :   http://software.nikhef.nl/security/lcmaps/
-                    requires: OpenSSL (using its OpenSSL interface) and Globus
-                              http://www.globus.org for more information.
+                    requires: OpenSSL, and
+                              Globus - http://www.globus.org
                     More info: http://www.nikhef.nl/pub/projects/grid/gridwiki/index.php/LCMAPS
 
 Listening:
