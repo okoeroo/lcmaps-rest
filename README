@@ -36,6 +36,7 @@ Dependencies:
     lcmaps      :   http://software.nikhef.nl/security/lcmaps/
                     requires: OpenSSL, and
                               Globus - http://www.globus.org
+                              VOMS API - See EMI website for details
                     More info: http://www.nikhef.nl/pub/projects/grid/gridwiki/index.php/LCMAPS
 
 Listening:
@@ -134,4 +135,18 @@ HTML output:
         secondary gid: 403<br>
         secondary gid: 507<br>
         </body></html>
+
+To do:
+    Proxy certificate support:
+        Accept classic proxy certificates and RFC3820 certificates for
+        authentication and as input to LCMAPS from the SSL handshake on the
+        Full SSL URI.
+    Add VOMS attribute parsing:
+        The VOMS attributes can be encoded in the URI. This needs to be parsed
+        and feed to the LCMAPS interface as input for a VOMS specific mapping
+        decision.  Note: the Full SSL interfaces already features VOMS AC
+        support.
+    Full SSL + REST for Multi User Pilot Job use case:
+        Combining the Full SSL interface with the REST based interface to
+        support Multi User Pilot Job use cases in wLCG projects.
 
