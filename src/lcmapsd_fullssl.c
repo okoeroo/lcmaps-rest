@@ -10,6 +10,7 @@
 #include "lcmapsd_common.h"
 #include "lcmapsd_fullssl.h"
 
+#include <openssl/x509v3.h>
 
 #define LCMAPSD_FULLSSL_URI         "/lcmaps/mapping/ssl"
 #define LCMAPSD_FULLSSL_BIND_IP     "0.0.0.0"
@@ -218,10 +219,8 @@ lcmapsd_fullssl_init(evbase_t * evbase) {
             .ssl_opts           = SSL_OP_NO_SSLv2,
             .verify_peer        = SSL_VERIFY_FAIL_IF_NO_PEER_CERT|SSL_VERIFY_PEER,
             .verify_depth       = 42,
-            /* .x509_verify_cb     = dummy_ssl_verify_callback, */
-            /* .x509_chk_issued_cb = dummy_check_issued_cb, */
-            .x509_verify_cb     = NULL,
-            .x509_chk_issued_cb = NULL,
+            .x509_verify_cb     = scas_verify_callback,
+            .x509_chk_issued_cb = grid_check_issued_wrapper,
             .scache_type        = evhtp_ssl_scache_type_internal,
             .scache_size        = 1024,
             .scache_timeout     = 1024,
@@ -232,6 +231,16 @@ lcmapsd_fullssl_init(evbase_t * evbase) {
     };
 
     evhtp_ssl_init(htp, &scfg);
+
+#if OPENSSL_VERSION_NUMBER < 0x00908000L
+    X509_STORE_set_flags(SSL_CTX_get_cert_store(htp->ssl_ctx), X509_V_FLAG_CRL_CHECK |
+            X509_V_FLAG_CRL_CHECK_ALL );
+#else
+    X509_STORE_set_flags(SSL_CTX_get_cert_store(htp->ssl_ctx), X509_V_FLAG_CRL_CHECK |
+            X509_V_FLAG_CRL_CHECK_ALL |
+            X509_V_FLAG_ALLOW_PROXY_CERTS );
+#endif /* OPENSSL_VERSION_NUMBER < 0x00908000L */
+
     evhtp_set_cb(htp, LCMAPSD_FULLSSL_URI, lcmapsd_fullssl_cb, NULL);
     evhtp_bind_socket(htp, LCMAPSD_FULLSSL_BIND_IP, LCMAPSD_FULLSSL_BIND_PORT, LCMAPSD_FULLSSL_LISTENERS);
 

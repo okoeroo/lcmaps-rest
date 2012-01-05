@@ -5,7 +5,13 @@
 #include <openssl/err.h>
 #include <openssl/rand.h>
 
+#include <openssl/bio.h>
+#include <openssl/err.h>
+#include <openssl/rand.h>
+#include <openssl/x509v3.h>
+
 #include <stdio.h>
+#include <string.h>
 #include <pwd.h>
 #include <evhtp.h>
 
@@ -53,5 +59,8 @@ lcmapsd_construct_mapping_in_json(struct evbuffer *buf,
                                   gid_t *          sgid_list,
                                   int              nsgid,
                                   char *           poolindex);
+
+int grid_check_issued_wrapper(X509_STORE_CTX *ctx,X509 *x,X509 *issuer);
+int scas_verify_callback(int ok, X509_STORE_CTX *store_ctx);
 
 #endif /* LCMAPSD_COMMON_H */

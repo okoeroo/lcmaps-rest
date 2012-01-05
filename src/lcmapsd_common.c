@@ -234,3 +234,435 @@ lcmapsd_construct_mapping_in_json(struct evbuffer *buf,
 
     return 0;
 }
+
+
+int grid_check_issued_wrapper(X509_STORE_CTX *ctx,X509 *x,X509 *issuer)
+/* We change the default callback to use our wrapper and discard errors
+   due to GSI proxy chains (ie where users certs act as CAs) */
+{
+    int ret = 0;
+    char * cert_DN   = NULL;
+    char * issuer_DN = NULL;
+
+    cert_DN   = X509_NAME_oneline(X509_get_subject_name(x), NULL, 0);
+    issuer_DN = X509_NAME_oneline(X509_get_issuer_name(issuer), NULL, 0);
+
+    fprintf(stderr, "%s:  issuer   = %s\n", __func__, issuer_DN);
+    fprintf(stderr, "%s:  subject  = %s\n", __func__, cert_DN);
+
+    free(cert_DN);
+    free(issuer_DN);
+
+    /* If all is ok, move out of here */
+    if ((ret = X509_check_issued(issuer, x)) == X509_V_OK)
+        return 1;
+ 
+    fprintf(stderr, "%s: check_issued returned: %s\n", __func__, X509_verify_cert_error_string (ret));
+ 
+    /* Non self-signed certs without signing are ok if they passed
+           the other checks inside X509_check_issued. Is this enough? */
+    if ((ret == X509_V_ERR_KEYUSAGE_NO_CERTSIGN) &&
+        (X509_subject_name_cmp(issuer, x) != 0)) return 1;
+ 
+    /* If we haven't asked for issuer errors don't set ctx */
+#if OPENSSL_VERSION_NUMBER < 0x00908000L
+    if (!(ctx->flags & X509_V_FLAG_CB_ISSUER_CHECK)) return 0;
+#else
+    if (!(ctx->param->flags & X509_V_FLAG_CB_ISSUER_CHECK)) return 0;
+#endif
+ 
+    ctx->error = ret;
+    ctx->current_cert = x;
+    ctx->current_issuer = issuer;
+
+    fprintf(stderr, "%s: calling ctx->verify_cb\n", __func__);
+    return ctx->verify_cb(0, ctx);
+}
+
+
+/**
+ * Note that timegm() is non-standard. Linux manpage advices the following
+ * substition instead.
+ */
+time_t my_timegm(struct tm *tm)
+{
+   time_t ret;
+   char *tz;
+
+   tz = getenv("TZ");
+   setenv("TZ", "", 1);
+   tzset();
+   ret = mktime(tm);
+   if (tz)
+       setenv("TZ", tz, 1);
+   else
+       unsetenv("TZ");
+   tzset();
+
+   return ret;
+}
+
+
+
+
+/**
+ *  (Use ASN1_STRING_data() to convert ASN1_GENERALIZEDTIME to char * if
+ *   necessary)
+ */
+
+time_t grid_asn1TimeToTimeT(char *asn1time, size_t len)
+{
+   char   zone;
+   struct tm time_tm;
+
+   if (len == 0) len = strlen(asn1time);
+
+   if ((len != 13) && (len != 15)) return 0; /* dont understand */
+
+   if ((len == 13) &&
+       ((sscanf(asn1time, "%02d%02d%02d%02d%02d%02d%c",
+         &(time_tm.tm_year),
+         &(time_tm.tm_mon),
+         &(time_tm.tm_mday),
+         &(time_tm.tm_hour),
+         &(time_tm.tm_min),
+         &(time_tm.tm_sec),
+         &zone) != 7) || (zone != 'Z'))) return 0; /* dont understand */
+
+   if ((len == 15) &&
+       ((sscanf(asn1time, "20%02d%02d%02d%02d%02d%02d%c",
+         &(time_tm.tm_year),
+         &(time_tm.tm_mon),
+         &(time_tm.tm_mday),
+         &(time_tm.tm_hour),
+         &(time_tm.tm_min),
+         &(time_tm.tm_sec),
+         &zone) != 7) || (zone != 'Z'))) return 0; /* dont understand */
+
+   /* time format fixups */
+
+   if (time_tm.tm_year < 90) time_tm.tm_year += 100;
+   --(time_tm.tm_mon);
+
+   return my_timegm(&time_tm);
+}
+
+
+
+/******************************************************************************
+Function:   x509IsCA
+Description:
+    Tests if the X509 * cert is a CA certificate or not
+    => Example from GridSite
+Parameters:
+    A X509 pointer
+Returns:
+    0      : Not a CA cert
+    1      : This is a CA cert
+******************************************************************************/
+int x509IsCA (X509 *cert)
+{
+
+/*
+#define NEW_CA_SEARCH_METHOD
+*/
+#ifndef NEW_CA_SEARCH_METHOD
+    int purpose_id;
+
+    purpose_id = X509_PURPOSE_get_by_sname("sslclient");
+
+    /* final argument to X509_check_purpose() is whether to check for CAness */
+
+    if (X509_check_purpose(cert, purpose_id + X509_PURPOSE_MIN, 1))
+        return 1;
+    else return 0;
+#else
+    int                                 element_index = -1;
+    int                                 critical;
+    BASIC_CONSTRAINTS *                 x509v3_bc = NULL;
+
+    if((x509v3_bc = X509_get_ext_d2i(cert,
+                                     NID_basic_constraints,
+                                     &critical,
+                                     &element_index)) && x509v3_bc->ca)
+    {
+        /* Free allocated space */
+        BASIC_CONSTRAINTS_free(x509v3_bc);
+
+        /* CA cert found */ 
+        return 1;
+    }
+
+    /* Not a CA cert */
+    return 0;
+#endif /* NEW_CA_SEARCH_METHOD */
+}
+
+
+
+    
+/******************************************************************************
+Function:       grid_X509_knownCriticalExts
+Description:    Check if the Critical Extention known to proxy certificates
+                are set and understood.
+Parameters:     X509 * cert
+Returns:        unsigned long : X509_V_OK (good), X509_V_ERR_UNHANDLED_CRITICAL_EXTENSION (bad)
+******************************************************************************/
+#define PROXYCERTINFO_OID      "1.3.6.1.5.5.7.1.14"
+#define OLD_PROXYCERTINFO_OID  "1.3.6.1.4.1.3536.1.222"
+
+unsigned long grid_X509_knownCriticalExts(X509 *cert)
+{
+   int  i = 0;
+   char critical[80];
+   X509_EXTENSION *ex;
+   char            data[256];
+
+
+   fprintf(stderr, "Entering %s\n", __func__);
+   for (i = 0; i < X509_get_ext_count(cert); ++i)
+   {
+        X509_NAME_oneline(X509_get_issuer_name(cert), data, 256);
+        fprintf(stderr, "%s:  issuer  = %s\n", __func__, data);
+        X509_NAME_oneline(X509_get_subject_name(cert), data, 256);
+        fprintf(stderr, "%s:  subject = %s\n", __func__, data);
+        ex = X509_get_ext(cert, i);
+
+        if (X509_EXTENSION_get_critical(ex) &&
+                                 !X509_supported_extension(ex))
+        {
+            OBJ_obj2txt(critical, sizeof(critical), X509_EXTENSION_get_object(ex), 1);
+
+            fprintf(stderr, "%s: Critical extension found: %s", __func__, critical);
+            if (strcmp(critical, PROXYCERTINFO_OID) == 0)     return X509_V_OK;
+            if (strcmp(critical, OLD_PROXYCERTINFO_OID) == 0) return X509_V_OK;
+
+            return X509_V_ERR_UNHANDLED_CRITICAL_EXTENSION;
+        }
+   }
+   return X509_V_OK;
+}
+
+
+
+/******************************************************************************
+Function:   grid_verifyProxy
+Description:
+    Tries to verify the proxies in the certstack
+******************************************************************************/
+unsigned long grid_verifyProxy( STACK_OF(X509) *certstack )
+{
+    int          i = 0;
+    X509       * cert = NULL;
+    time_t       now = time((time_t *)NULL);
+    size_t       len = 0;             /* Lengths of issuer and cert DN */
+    size_t       len2 = 0;            /* Lengths of issuer and cert DN */
+    int          prevIsLimited = 0;   /* previous cert was proxy and limited */
+    char         cert_DN   [256];     /* Pointer to current-certificate-in-certstack's DN */
+    char         issuer_DN [256];     /* Pointer to issuer-of-current-cert-in-certstack's DN */
+    char       * proxy_part_DN = NULL;
+    int          depth = sk_X509_num (certstack);
+    int          amount_of_CAs = 0;
+
+    fprintf(stderr, "%s: --- Welcome to the grid_verifyProxy function ---\n", __func__);
+
+    if (depth == 0)
+    {
+        fprintf(stderr, "%s: Error: Empty certificate chain presented!\n", __func__);
+        return X509_V_ERR_APPLICATION_VERIFICATION;
+    }
+
+
+    /* And there was (current) time... */
+    time(&now);
+
+
+    /* How many CA certs are there in the certstack? */
+    for (i = 0; i < depth; i++)
+    {
+        if (x509IsCA(sk_X509_value(certstack, i)))
+            amount_of_CAs++;
+    }
+
+    fprintf(stderr, "%s: #CA's = %d , depth = %d\n", __func__, amount_of_CAs, depth);
+
+    /* Check if our certificate chain could hold anything useful, like proxies or EECs */
+    if ((amount_of_CAs + 2) > depth)
+    {
+        if ((depth - amount_of_CAs) > 0)
+        {
+            fprintf(stderr, "%s: No proxy certificate in certificate stack to check.\n", __func__);
+            return X509_V_OK;
+        }
+        else
+        {
+            fprintf(stderr, "%s: No personal certificate (neither proxy or user certificate) found in the certficiate stack.", __func__);
+            return X509_V_ERR_APPLICATION_VERIFICATION;
+        }
+    }
+
+
+    /* 
+     * Changed this value to start checking the proxy and such and
+     * to skip the CA and the user_cert
+     */
+
+    for (i = depth - (amount_of_CAs + 2); i >= 0; i--)
+    {
+        /* Check for X509 certificate and point to it with 'cert' */
+        if ( (cert = sk_X509_value(certstack, i)) != NULL )
+        {
+            X509_NAME_oneline(X509_get_subject_name(cert), cert_DN,   256);
+            X509_NAME_oneline(X509_get_issuer_name(cert),  issuer_DN, 256);
+            len       = strlen( cert_DN );
+            len2      = strlen( issuer_DN );
+
+            fprintf(stderr, "%s: Proxy to verify:\n", __func__ );
+            fprintf(stderr, "%s:   Issuer DN: %s\n", __func__, issuer_DN );
+            fprintf(stderr, "%s:   DN:        %s\n", __func__, cert_DN );
+
+            if (now < grid_asn1TimeToTimeT((char *)ASN1_STRING_data(X509_get_notBefore(cert)),0))
+            {
+                fprintf(stderr, "%s: Proxy certificate is not yet valid.\n", __func__);
+                return X509_V_ERR_CERT_NOT_YET_VALID;
+            }
+
+            if (now > grid_asn1TimeToTimeT((char *)ASN1_STRING_data(X509_get_notAfter(cert)),0))
+            {
+                fprintf(stderr, "%s: Proxy certificate expired.\n", __func__);
+                return X509_V_ERR_CERT_HAS_EXPIRED;
+            }
+
+            /* User not allowed to sign shortened DN */
+            /* Note: Only true for GT2 proxies */
+            if (len2 > len)
+            {
+                fprintf(stderr, "%s: It is not allowed to sign a shorthened DN.\n", __func__);
+                return X509_V_ERR_INVALID_CA;
+            }
+
+            /* Proxy subject must begin with issuer. */ /* This is not true in RFC/GT4 proxies */
+            if (strncmp(cert_DN, issuer_DN, len2) != 0)
+            {
+                fprintf(stderr, "%s: Proxy subject must begin with the issuer.\n", __func__);
+                return X509_V_ERR_INVALID_CA;
+            }
+
+            /* Set pointer to end of base DN in cert_DN */
+            proxy_part_DN = &cert_DN[len2];
+
+            /* First attempt at support for Old and New style GSI
+               proxies: /CN=anything is ok for now */
+            if (strncmp(proxy_part_DN, "/CN=", 4) != 0)
+            {
+                fprintf(stderr, "%s: Could not find a /CN= structure in the DN, thus it is not a proxy.\n", __func__);
+                return X509_V_ERR_INVALID_CA;
+            }
+
+            /* The following structures need to be reworked to support for GSI/RFC3820 proxies */
+            if ((strncmp(proxy_part_DN, "/CN=proxy", 9) == 0) && (i > 0))
+            {
+                fprintf(stderr, "%s:  Found old style proxy.\n", __func__);
+            }
+
+
+            if ((strncmp(proxy_part_DN, "/CN=limited proxy", 17) == 0) && (i > 0))
+            {
+                prevIsLimited = 1;
+                fprintf(stderr, "%s:  Found old style limited proxy.\n", __func__);
+            }
+            else
+            {
+                if (prevIsLimited)
+                {
+                    fprintf(stderr, "%s: Proxy chain integrity error. Previous proxy in chain was limited, but this one is a regular proxy.\n", __func__);
+                    return X509_V_ERR_INVALID_CA;
+                }
+            }
+            fprintf(stderr, "%s:   Proxy is valid\n", __func__);
+        }
+    }
+
+    return X509_V_OK;
+}
+
+
+
+
+
+/******************************************************************************
+Function:       scas_verify_callback()
+Description:    Execute the OpenSSL verify callback
+                The ok will be the result of the default verification function
+Parameters:     ok, X509_STORE_CTX *
+Returns:        int
+******************************************************************************/
+int scas_verify_callback(int ok, X509_STORE_CTX *store_ctx)
+{
+    unsigned long   errnum   = X509_STORE_CTX_get_error(store_ctx);
+    int             errdepth = X509_STORE_CTX_get_error_depth(store_ctx);
+    X509           *cert     = X509_STORE_CTX_get_current_cert(store_ctx);
+    STACK_OF(X509) *certstack = NULL;
+    char *          cert_DN   = NULL;
+    char *          issuer_DN = NULL;
+
+    fprintf(stderr, "%s\n", __func__);
+
+    cert_DN   = X509_NAME_oneline (X509_get_subject_name (cert), NULL, 0);
+    issuer_DN = X509_NAME_oneline (X509_get_issuer_name (cert), NULL, 0);
+    fprintf(stderr, "%s: DN:        %s\n", __func__, cert_DN);
+    fprintf(stderr, "%s: Issuer DN: %s\n", __func__, issuer_DN);
+
+    /* Resolve known error state and flag them as 'ok' */
+    if (ok != 1)
+    {
+        if (errnum == X509_V_ERR_INVALID_CA) ok=1;
+        if (errnum == X509_V_ERR_UNABLE_TO_GET_CRL) ok=1;
+#if OPENSSL_VERSION_NUMBER >= 0x00908000L
+        /* I don't want to do this, really, but I have yet to figure out
+           how to get openssl 0.9.8 to accept proxy certificates when
+           opening a new SSL connection...
+        */
+        if (errnum == X509_V_ERR_INVALID_PURPOSE) ok=1;
+#endif
+        if (errnum == X509_V_ERR_UNHANDLED_CRITICAL_EXTENSION)
+        {
+            /* errnum = grid_knownCriticalExts( cert ); */
+            errnum = grid_X509_knownCriticalExts (cert);
+            store_ctx->error = errnum;
+            if (errnum == X509_V_OK) ok=1;
+        }
+    }
+
+
+    /*
+     * We've now got the last certificate - the identity being used for
+     * this connection. At this point we check the whole chain for valid
+     * CAs or, failing that, GSI-proxy validity using grid_verifyProxy
+     */
+    if ( (errdepth == 0) && (ok == 1) )
+    {
+        certstack = (STACK_OF(X509) *) X509_STORE_CTX_get_chain (store_ctx);
+
+        fprintf(stderr, "%s: End of certificate chain: performing full chain check in grid_verifyProxy()\n", __func__);
+
+        errnum = grid_verifyProxy (certstack);
+        store_ctx->error = errnum;
+        if (errnum == X509_V_OK) ok=1;
+    }
+
+    if (ok != 1)
+    {
+        fprintf(stderr, "scas_verify_callback: error message = %s\n", 
+                 X509_verify_cert_error_string (errnum));
+    }
+
+
+    /* The current way of working needs freeing */
+    free (cert_DN);
+    free (issuer_DN);
+
+    return ok;
+}
+
+
