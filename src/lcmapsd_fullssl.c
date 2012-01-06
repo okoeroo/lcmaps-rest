@@ -146,7 +146,7 @@ lcmapsd_fullssl_cb(evhtp_request_t * req, void * a) {
 #ifdef DEBUG
     printf("Got SSL enabled link\n");
 #endif
-    /* BUG: Still connected after SSL failed. 
+    /* BUG: Still connected after SSL failed.
             Example: wrong certificate purpose on the server side (using a
             client cert) AND when the host cert is expired (might be a
             feature :). */
@@ -196,7 +196,7 @@ lcmapsd_fullssl_cb(evhtp_request_t * req, void * a) {
             px509 = sk_X509_value(px509_chain, i);
             if (px509) {
                 X509_NAME_oneline(X509_get_subject_name(px509), tmp_dn, 256);
-                printf("Depth level %i: Subject DN: %s\n", i, tmp_dn); 
+                printf("Depth level %i: Subject DN: %s\n", i, tmp_dn);
             }
         }
     }
