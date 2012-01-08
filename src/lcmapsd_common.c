@@ -241,8 +241,6 @@ int grid_check_issued_wrapper(X509_STORE_CTX *ctx,X509 *x,X509 *issuer)
    due to GSI proxy chains (ie where users certs act as CAs) */
 {
     int ret = 0;
-    char * cert_DN   = NULL;
-    char * issuer_DN = NULL;
 
     /* If all is ok, move out of here */
     if ((ret = X509_check_issued(issuer, x)) == X509_V_OK)
@@ -272,7 +270,7 @@ int grid_check_issued_wrapper(X509_STORE_CTX *ctx,X509 *x,X509 *issuer)
  * Note that timegm() is non-standard. Linux manpage advices the following
  * substition instead.
  */
-time_t my_timegm(struct tm *tm)
+time_t lcmapsd_tm2time_t_in_utc(struct tm *tm)
 {
    time_t ret;
    char *tz;
@@ -291,56 +289,52 @@ time_t my_timegm(struct tm *tm)
 }
 
 
-
-
-/**
- *  (Use ASN1_STRING_data() to convert ASN1_GENERALIZEDTIME to char * if
- *   necessary)
- */
-
-time_t grid_asn1TimeToTimeT(char *asn1time, size_t len)
+int
+asn1time_to_time(ASN1_TIME *asn1time, time_t *result)
 {
-   char   zone;
-   struct tm time_tm;
+    struct tm tm;
+    time_t res = -1;
 
-   if (len == 0) len = strlen(asn1time);
+    if (!asn1time || !asn1time->data || !result)
+        return 1;
 
-   if ((len != 13) && (len != 15)) return 0; /* dont understand */
+    memset(&tm, 0, sizeof(struct tm));
 
-   if ((len == 13) &&
-       ((sscanf(asn1time, "%02d%02d%02d%02d%02d%02d%c",
-         &(time_tm.tm_year),
-         &(time_tm.tm_mon),
-         &(time_tm.tm_mday),
-         &(time_tm.tm_hour),
-         &(time_tm.tm_min),
-         &(time_tm.tm_sec),
-         &zone) != 7) || (zone != 'Z'))) return 0; /* dont understand */
+    switch (asn1time->type) {
+        case V_ASN1_UTCTIME:
+            if (sscanf((char *)asn1time->data,
+                       "%2d%2d%2d%2d%2d%2dZ",
+                       &tm.tm_year, &tm.tm_mon,
+                       &tm.tm_mday, &tm.tm_hour,
+                       &tm.tm_min, &tm.tm_sec) != 6) {
+                return 1;
+            }
+            tm.tm_mon--;
+            if (tm.tm_year < 69) {
+                tm.tm_year += 100;
+                /* tm.tm_year += 2000; */
+            } else {
+                tm.tm_year += 1900;
+            }
+            break;
+        case V_ASN1_GENERALIZEDTIME:
+            if (sscanf((char *)asn1time->data,
+                       "%4d%2d%2d%2d%2d%2dZ",
+                       &tm.tm_year, &tm.tm_mon,
+                       &tm.tm_mday, &tm.tm_hour,
+                       &tm.tm_min, &tm.tm_sec) != 6) {
+                return 1;
+            }
+            break;
+        default:
+            return 1;
+    }
 
-   if ((len == 15) &&
-       ((sscanf(asn1time, "20%02d%02d%02d%02d%02d%02d%c",
-         &(time_tm.tm_year),
-         &(time_tm.tm_mon),
-         &(time_tm.tm_mday),
-         &(time_tm.tm_hour),
-         &(time_tm.tm_min),
-         &(time_tm.tm_sec),
-         &zone) != 7) || (zone != 'Z'))) return 0; /* dont understand */
+    /* Convert the struct tm to time_t, enforcing UTC */
+    res = lcmapsd_tm2time_t_in_utc(&tm);
+    *result = res;
 
-   /* time format fixups */
-
-   if (time_tm.tm_year < 90) time_tm.tm_year += 100;
-   --(time_tm.tm_mon);
-
-   printf("year: %d\n", time_tm.tm_year);
-   printf("mon:  %d\n", time_tm.tm_mon);
-   printf("mday: %d\n" , time_tm.tm_mday);
-   printf("hour: %d\n", time_tm.tm_hour);
-   printf("min:  %d\n", time_tm.tm_min);
-   printf("sec:  %d\n", time_tm.tm_sec);
-   printf("%c\n", zone);
-
-   return my_timegm(&time_tm);
+    return 0;
 }
 
 
@@ -418,6 +412,7 @@ unsigned long grid_verifyProxy( STACK_OF(X509) *certstack )
     int          i = 0;
     X509       * cert = NULL;
     time_t       now = time((time_t *)NULL);
+    time_t       val_time = -1;
     size_t       len = 0;             /* Lengths of issuer and cert DN */
     size_t       len2 = 0;            /* Lengths of issuer and cert DN */
     int          prevIsLimited = 0;   /* previous cert was proxy and limited */
@@ -435,7 +430,7 @@ unsigned long grid_verifyProxy( STACK_OF(X509) *certstack )
 
 
     /* And there was (current) time... */
-    time(&now);
+    /* now = time(&now); */
 
 
     /* How many CA certs are there in the certstack? */
@@ -445,7 +440,9 @@ unsigned long grid_verifyProxy( STACK_OF(X509) *certstack )
             amount_of_CAs++;
     }
 
+#if 0
     fprintf(stderr, "%s: #CA's = %d , depth = %d\n", __func__, amount_of_CAs, depth);
+#endif
 
     /* Check if our certificate chain could hold anything useful, like proxies or EECs */
     if ((amount_of_CAs + 2) > depth)
@@ -478,18 +475,25 @@ unsigned long grid_verifyProxy( STACK_OF(X509) *certstack )
             len       = strlen( cert_DN );
             len2      = strlen( issuer_DN );
 
+#if 0
             fprintf(stderr, "%s: Proxy to verify:\n", __func__ );
             fprintf(stderr, "%s:   Issuer DN: %s\n", __func__, issuer_DN );
             fprintf(stderr, "%s:   DN:        %s\n", __func__, cert_DN );
+#endif
 
-            if (now < grid_asn1TimeToTimeT((char *)ASN1_STRING_data(X509_get_notBefore(cert)),0))
+            if (asn1time_to_time(X509_get_notBefore(cert), &val_time)) {
+                return X509_V_ERR_ERROR_IN_CERT_NOT_BEFORE_FIELD;
+            }
+            if (now < val_time) /* When true, then it's expired */
             {
-                fprintf(stderr, "%s: Proxy certificate is not yet valid.\n", __func__);
+                fprintf(stderr, "%s: Proxy not yet valid.\n", __func__);
                 return X509_V_ERR_CERT_NOT_YET_VALID;
             }
 
-            fprintf (stderr, "------ > %d   %u\n", now, grid_asn1TimeToTimeT((char *)ASN1_STRING_data(X509_get_notAfter(cert)),0));
-            if (now > grid_asn1TimeToTimeT((char *)ASN1_STRING_data(X509_get_notAfter(cert)),0))
+            if (asn1time_to_time(X509_get_notAfter(cert), &val_time)) {
+                return X509_V_ERR_ERROR_IN_CERT_NOT_AFTER_FIELD;
+            }
+            if (now > val_time) /* When true, then it's expired */
             {
                 fprintf(stderr, "%s: Proxy certificate expired.\n", __func__);
                 return X509_V_ERR_CERT_HAS_EXPIRED;
@@ -541,7 +545,9 @@ unsigned long grid_verifyProxy( STACK_OF(X509) *certstack )
                     return X509_V_ERR_INVALID_CA;
                 }
             }
+#if 0
             fprintf(stderr, "%s:   Proxy is valid\n", __func__);
+#endif
         }
     }
 
@@ -609,7 +615,7 @@ int scas_verify_callback(int ok, X509_STORE_CTX *store_ctx)
 
     if (ok != 1)
     {
-        fprintf(stderr, "scas_verify_callback: error message = %s\n",
+        fprintf(stderr, "verify_callback: error message = %s\n",
                 X509_verify_cert_error_string (errnum));
     }
 

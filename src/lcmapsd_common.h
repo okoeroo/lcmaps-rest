@@ -60,7 +60,18 @@ lcmapsd_construct_mapping_in_json(struct evbuffer *buf,
                                   int              nsgid,
                                   char *           poolindex);
 
+#define PROXYCERTINFO_OID      "1.3.6.1.5.5.7.1.14"
+#define OLD_PROXYCERTINFO_OID  "1.3.6.1.4.1.3536.1.222"
+
 int grid_check_issued_wrapper(X509_STORE_CTX *ctx,X509 *x,X509 *issuer);
 int scas_verify_callback(int ok, X509_STORE_CTX *store_ctx);
+
+time_t lcmapsd_tm2time_t_in_utc(struct tm *tm);
+int asn1time_to_time(ASN1_TIME *asn1time, time_t *result);
+int x509IsCA (X509 *cert);
+
+unsigned long grid_X509_knownCriticalExts(X509 *cert);
+unsigned long grid_verifyProxy( STACK_OF(X509) *certstack);
+
 
 #endif /* LCMAPSD_COMMON_H */
