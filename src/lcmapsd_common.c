@@ -449,7 +449,7 @@ unsigned long grid_verifyProxy( STACK_OF(X509) *certstack )
     {
         if ((depth - amount_of_CAs) > 0)
         {
-            fprintf(stderr, "%s: No proxy certificate in certificate stack to check.\n", __func__);
+            syslog(LOG_DEBUG, "%s: No proxy certificate in certificate stack to check.\n", __func__);
             return X509_V_OK;
         }
         else

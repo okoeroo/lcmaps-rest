@@ -53,7 +53,7 @@ Listening:
 URI:
     https://localhost:8443/lcmaps/mapping/ssl
     https://localhost:7443/lcmaps/mapping/rest
-    https://localhost:8008/lcmaps/mapping/rest
+    http://localhost:8008/lcmaps/mapping/rest
 
 Queries for all URI:
     ?format=json        :   Mapping output in JSON 
@@ -67,6 +67,23 @@ Queries specific to the "/lcmaps/mapping/rest" URI:
                             Note: Add FQANs multiple times for mulitple group
                                   and role affiliations.
                             FQANs MUST be combined with a subjectdn=
+
+Example input (based on certificates):
+#using a certificate
+curl \
+    --capath /etc/grid-security/certificates/ \
+    --cert `pwd`/.globus/terena/terena-cert.pem \
+    --key `pwd`/.globus/terena/terena-key.pem \
+    https://localhost:8443/lcmaps/mapping/ssl
+
+#using a proxy certificate
+curl \
+    --capath /etc/grid-security/certificates/ \
+    --cacert `pwd`/.globus/terena/terena-key.pem \
+    --cert /tmp/x509up_u501 \
+    --key /tmp/x509up_u501 \
+    https://localhost:8443/lcmaps/mapping/ssl
+
 
 JSON output:
     Content-Type: application/json
