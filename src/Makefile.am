@@ -18,8 +18,8 @@
 
 EXTRACOMPILEFLAGS = \
     -g -Wall \
-    -O -Wuninitialized \
-    -Wbad-function-cast -Wcast-align \
+    -Wuninitialized \
+    -Wbad-function-cast \
     -Wmissing-prototypes -Wnested-externs -Wpointer-arith \
     -Wcast-qual -Wchar-subscripts -Winline \
     -Wredundant-decls -Wno-long-long \
