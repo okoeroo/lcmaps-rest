@@ -169,7 +169,7 @@ lcmapsd_construct_mapping_in_xml(struct evbuffer * buf,
     int i = 0;
 
     /* Construct message body */
-    evbuffer_add_printf(buf, "<!DOCTYPE glossary PUBLIC \"-//OASIS//DTD DocBook V3.1//EN\">\n");
+    evbuffer_add_printf(buf, "<?xml version=\"1.0\"?>\n");
     evbuffer_add_printf(buf, "<lcmaps>\n");
     evbuffer_add_printf(buf, "  <mapping>\n");
     evbuffer_add_printf(buf, "    <posix>\n");
