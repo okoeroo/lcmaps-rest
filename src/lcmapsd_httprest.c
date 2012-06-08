@@ -44,7 +44,7 @@ lcmapsd_perform_lcmaps_from_uri(evhtp_request_t *req) {
     subjectdn = evhtp_kv_find(req->uri->query, "subjectdn");
     if (!subjectdn) {
         /* Fail, MUST have a subject DN */
-        lcmapsd_construct_error_reply_in_html(req->buffer_out,
+        lcmapsd_construct_error_reply_in_html(req,
                                               "Missing Subject DN",
                                               "The URI \"%s\" requires a query to \"?subjectdn=<value>\".",
                                               LCMAPSD_HTTP_URI);
@@ -55,7 +55,7 @@ lcmapsd_perform_lcmaps_from_uri(evhtp_request_t *req) {
     userdn = calloc(1, strlen(subjectdn) + 1); /* Encoded is always more then not encoded */
     if (evhtp_unescape_string((unsigned char **)&userdn, (unsigned char *)subjectdn, strlen(subjectdn)) != 0) {
         /* Unparseable */
-        lcmapsd_construct_error_reply_in_html(req->buffer_out,
+        lcmapsd_construct_error_reply_in_html(req,
                                               "Parse error in ?subjectdn=<value>",
                                               "Could not unescape the ?subjectdn=<value> value");
         resp_code = EVHTP_RES_BADREQ; /* 400 */
@@ -68,7 +68,7 @@ lcmapsd_perform_lcmaps_from_uri(evhtp_request_t *req) {
     if (lcmaps_init(NULL) != 0) {
         /* Unable to initialize LCMAPS, have a look at the config file and
          * logfile */
-        lcmapsd_construct_error_reply_in_html(req->buffer_out,
+        lcmapsd_construct_error_reply_in_html(req,
                                               "LCMAPS initialization failure",
                                               "Failure in initializing LCMAPS.<br>\n" \
                                               "Could be: configuration file errors, " \
@@ -90,44 +90,30 @@ lcmapsd_perform_lcmaps_from_uri(evhtp_request_t *req) {
                         &nsgid,
                         &poolindexp);
     if (lcmaps_res != 0) {
-        lcmapsd_construct_error_reply_in_html(req->buffer_out,
+        lcmapsd_construct_error_reply_in_html(req,
                                               "LCMAPS mapping failure",
                                               "Failure in mapping your provided credentials in LCMAPS");
         resp_code = EVHTP_RES_FORBIDDEN; /* 403 */
-        goto end;
-    }
-    if (lcmaps_term() != 0) {
-        /* Could not tierdown LCMAPS */
-        lcmapsd_construct_error_reply_in_html(req->buffer_out,
-                                              "LCMAPS termination failed",
-                                              "Failure detected when LCMAPS tried to terminate");
-        resp_code = EVHTP_RES_SERVERR; /* 500 */
         goto end;
     }
 
     /* Construct message body */
     switch (lcmapsd_select_return_format(req)) {
         case TYPE_JSON:
-            lcmapsd_construct_mapping_in_json(req->buffer_out,
+            lcmapsd_construct_mapping_in_json(req,
                                               uid, pgid_list, npgid, sgid_list, nsgid, poolindexp);
-            evhtp_headers_add_header(req->headers_out,
-                                     evhtp_header_new("Content-Type", "application/json", 0, 0));
             break;
         case TYPE_XML:
-            lcmapsd_construct_mapping_in_xml(req->buffer_out,
+            lcmapsd_construct_mapping_in_xml(req,
                                              uid, pgid_list, npgid, sgid_list, nsgid, poolindexp);
-            evhtp_headers_add_header(req->headers_out,
-                                     evhtp_header_new("Content-Type", "text/xml", 0, 0));
             break;
         case TYPE_HTML:
-            lcmapsd_construct_mapping_in_html(req->buffer_out, 
+            lcmapsd_construct_mapping_in_html(req, 
                                               uid, pgid_list, npgid, sgid_list, nsgid, poolindexp);
-            evhtp_headers_add_header(req->headers_out,
-                                     evhtp_header_new("Content-Type", "text/html", 0, 0));
             break;
         default:
             /* Fail, unsupported format */
-            lcmapsd_construct_error_reply_in_html(req->buffer_out,
+            lcmapsd_construct_error_reply_in_html(req,
                                                   "Wrong format query or accept header value",
                                                   "The value in the format query or accept header value " \
                                                   "is not supported.<br>\n" \
@@ -138,11 +124,18 @@ lcmapsd_perform_lcmaps_from_uri(evhtp_request_t *req) {
             resp_code = EVHTP_RES_BADREQ; /* 400 */
             goto end;
     }
+    /* Do term here or we'll lose the gids (via lcmaps_stopPluginManager() ) */
+    if (lcmaps_term() != 0) {
+        /* Could not tierdown LCMAPS */
+        lcmapsd_construct_error_reply_in_html(req,
+                                              "LCMAPS termination failed",
+                                              "Failure detected when LCMAPS tried to terminate");
+        resp_code = EVHTP_RES_SERVERR; /* 500 */
+        goto end;
+    }
     resp_code = EVHTP_RES_OK; /* 200 */
 
 end:
-    free(pgid_list);
-    free(sgid_list);
 
     return resp_code;
 }

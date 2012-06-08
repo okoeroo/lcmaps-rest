@@ -31,12 +31,12 @@ int dummy_check_issued_cb(X509_STORE_CTX * ctx, X509 * x, X509 * issuer);
 evhtp_res my_accept_cb(evhtp_connection_t * conn, void * arg);
 
 int
-lcmapsd_construct_error_reply_in_html(struct evbuffer *buf,
+lcmapsd_construct_error_reply_in_html(evhtp_request_t *req,
                                       const char * title,
                                       const char * body_fmt,
                                       ...);
 int
-lcmapsd_construct_mapping_in_html(struct evbuffer *buf,
+lcmapsd_construct_mapping_in_html(evhtp_request_t *req,
                                   uid_t            uid,
                                   gid_t *          pgid_list,
                                   int              npgid,
@@ -44,7 +44,7 @@ lcmapsd_construct_mapping_in_html(struct evbuffer *buf,
                                   int              nsgid,
                                   char *           poolindex);
 int
-lcmapsd_construct_mapping_in_xml(struct evbuffer *buf,
+lcmapsd_construct_mapping_in_xml(evhtp_request_t *req,
                                   uid_t            uid,
                                   gid_t *          pgid_list,
                                   int              npgid,
@@ -52,7 +52,7 @@ lcmapsd_construct_mapping_in_xml(struct evbuffer *buf,
                                   int              nsgid,
                                   char *           poolindex);
 int
-lcmapsd_construct_mapping_in_json(struct evbuffer *buf,
+lcmapsd_construct_mapping_in_json(evhtp_request_t *req,
                                   uid_t            uid,
                                   gid_t *          pgid_list,
                                   int              npgid,

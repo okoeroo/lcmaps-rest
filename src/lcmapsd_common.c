@@ -112,27 +112,31 @@ my_accept_cb(evhtp_connection_t * conn, void * arg) {
 }
 
 int
-lcmapsd_construct_error_reply_in_html(struct evbuffer *buf,
+lcmapsd_construct_error_reply_in_html(evhtp_request_t *req,
                                       const char * title,
                                       const char * body_fmt,
                                       ...) {
     va_list ap;
 
-    evbuffer_add_printf(buf, "<html><head><title>%s</title></head><body>\n", PACKAGE_NAME);
+    evbuffer_add_printf(req->buffer_out, "<html><head><title>%s</title></head><body>\n", PACKAGE_NAME);
     if (title) {
-        evbuffer_add_printf(buf, "<h1>%s: %s</h1>\n", PACKAGE_NAME, title);
+        evbuffer_add_printf(req->buffer_out, "<h1>%s: %s</h1>\n", PACKAGE_NAME, title);
     }
     if (body_fmt) {
         va_start(ap, body_fmt);
-        evbuffer_add_vprintf(buf, body_fmt, ap);
+        evbuffer_add_vprintf(req->buffer_out, body_fmt, ap);
         va_end(ap);
     }
-    evbuffer_add_printf(buf, "\n</body></html>\n");
+    evbuffer_add_printf(req->buffer_out, "\n</body></html>\n");
+
+    evhtp_headers_add_header(req->headers_out,
+			     evhtp_header_new("Content-Type", "text/html", 0, 0));
+
     return 0;
 }
 
 int
-lcmapsd_construct_mapping_in_html(struct evbuffer *buf,
+lcmapsd_construct_mapping_in_html(evhtp_request_t *req,
                                   uid_t            uid,
                                   gid_t *          pgid_list,
                                   int              npgid,
@@ -142,24 +146,27 @@ lcmapsd_construct_mapping_in_html(struct evbuffer *buf,
     int i = 0;
 
     /* Construct message body */
-    evbuffer_add_printf(buf, "<html><body>\n");
-    evbuffer_add_printf(buf, "uid: %d<br>\n", uid);
+    evbuffer_add_printf(req->buffer_out, "<html><body>\n");
+    evbuffer_add_printf(req->buffer_out, "uid: %d<br>\n", uid);
     for (i = 0; i < npgid; i++) {
-        evbuffer_add_printf(buf, "gid: %d<br>\n", pgid_list[i]);
+        evbuffer_add_printf(req->buffer_out, "gid: %d<br>\n", pgid_list[i]);
     }
     for (i = 0; i < nsgid; i++) {
-        evbuffer_add_printf(buf, "secondary gid: %d<br>\n", sgid_list[i]);
+        evbuffer_add_printf(req->buffer_out, "secondary gid: %d<br>\n", sgid_list[i]);
     }
     if (poolindex) {
-        evbuffer_add_printf(buf, "poolindex: %s<br>\n", poolindex);
+        evbuffer_add_printf(req->buffer_out, "poolindex: %s<br>\n", poolindex);
     }
-    evbuffer_add_printf(buf, "</body></html>\n");
+    evbuffer_add_printf(req->buffer_out, "</body></html>\n");
+
+    evhtp_headers_add_header(req->headers_out,
+			     evhtp_header_new("Content-Type", "text/html", 0, 0));
 
     return 0;
 }
 
 int
-lcmapsd_construct_mapping_in_xml(struct evbuffer * buf,
+lcmapsd_construct_mapping_in_xml(evhtp_request_t *req,
                                  uid_t             uid,
                                  gid_t *           pgid_list,
                                  int               npgid,
@@ -169,39 +176,43 @@ lcmapsd_construct_mapping_in_xml(struct evbuffer * buf,
     int i = 0;
 
     /* Construct message body */
-    evbuffer_add_printf(buf, "<?xml version=\"1.0\"?>\n");
-    evbuffer_add_printf(buf, "<lcmaps>\n");
-    evbuffer_add_printf(buf, "  <mapping>\n");
-    evbuffer_add_printf(buf, "    <posix>\n");
-    evbuffer_add_printf(buf, "      <uid>\n");
-    evbuffer_add_printf(buf, "        <id>%d</id>\n", uid);
-    evbuffer_add_printf(buf, "      </uid>\n");
+/*    evbuffer_add_printf(req->buffer_out, "<!DOCTYPE glossary PUBLIC \"-//OASIS//DTD DocBook V3.1//EN\" >\n");*/
+    evbuffer_add_printf(req->buffer_out, "<lcmaps>\n");
+    evbuffer_add_printf(req->buffer_out, "  <mapping>\n");
+    evbuffer_add_printf(req->buffer_out, "    <posix>\n");
+    evbuffer_add_printf(req->buffer_out, "      <uid>\n");
+    evbuffer_add_printf(req->buffer_out, "        <id>%d</id>\n", uid);
+    evbuffer_add_printf(req->buffer_out, "      </uid>\n");
     if (npgid > 0) {
-        evbuffer_add_printf(buf, "      <pgid>\n");
-        evbuffer_add_printf(buf, "        <id>%d</id>\n", pgid_list[0]);
-        evbuffer_add_printf(buf, "      </pgid>\n");
+        evbuffer_add_printf(req->buffer_out, "      <pgid>\n");
+        evbuffer_add_printf(req->buffer_out, "        <id>%d</id>\n", pgid_list[0]);
+        evbuffer_add_printf(req->buffer_out, "      </pgid>\n");
     }
     if (nsgid > 0) {
-        evbuffer_add_printf(buf, "      <sgid>\n");
-        evbuffer_add_printf(buf, "        <array>\n");
+        evbuffer_add_printf(req->buffer_out, "      <sgid>\n");
+        evbuffer_add_printf(req->buffer_out, "        <array>\n");
         for (i = 0; i < nsgid; i++) {
-            evbuffer_add_printf(buf, "          <id>%d</id>\n", sgid_list[i]);
+            evbuffer_add_printf(req->buffer_out, "          <id>%d</id>\n", sgid_list[i]);
         }
-        evbuffer_add_printf(buf, "        </array>\n");
-        evbuffer_add_printf(buf, "      </sgid>\n");
+        evbuffer_add_printf(req->buffer_out, "        </array>\n");
+        evbuffer_add_printf(req->buffer_out, "      </sgid>\n");
     }
-    evbuffer_add_printf(buf, "    </posix>\n");
+    evbuffer_add_printf(req->buffer_out, "    </posix>\n");
     if (poolindex) {
-        evbuffer_add_printf(buf, "    <poolindex>%s</poolindex>\n", poolindex);
+        evbuffer_add_printf(req->buffer_out, "    <poolindex>%s</poolindex>\n", poolindex);
     }
-    evbuffer_add_printf(buf, "  </mapping>\n");
-    evbuffer_add_printf(buf, "</lcmaps>\n");
+    evbuffer_add_printf(req->buffer_out, "  </mapping>\n");
+    evbuffer_add_printf(req->buffer_out, "</lcmaps>\n");
+
+    evhtp_headers_add_header(req->headers_out,
+			 evhtp_header_new("Content-Type", "text/xml", 0, 0));
+
     return 0;
 }
 
 
 int
-lcmapsd_construct_mapping_in_json(struct evbuffer *buf,
+lcmapsd_construct_mapping_in_json(evhtp_request_t *req,
                                   uid_t            uid,
                                   gid_t *          pgid_list,
                                   int              npgid,
@@ -211,26 +222,29 @@ lcmapsd_construct_mapping_in_json(struct evbuffer *buf,
     int i = 0;
 
     /* Construct message body */
-    evbuffer_add_printf(buf, "{\"lcmaps\": {\n");
-    evbuffer_add_printf(buf, "    \"mapping\": {\n");
-    evbuffer_add_printf(buf, "        \"posix\": {\n");
-    evbuffer_add_printf(buf, "            \"uid\": { \"id\": %d }%s\n", uid, npgid || nsgid ? "," : "");
+    evbuffer_add_printf(req->buffer_out, "{\"lcmaps\": {\n");
+    evbuffer_add_printf(req->buffer_out, "    \"mapping\": {\n");
+    evbuffer_add_printf(req->buffer_out, "        \"posix\": {\n");
+    evbuffer_add_printf(req->buffer_out, "            \"uid\": { \"id\": %d }%s\n", uid, npgid || nsgid ? "," : "");
     if (npgid > 0) {
-    evbuffer_add_printf(buf, "            \"pgid\": { \"id\": %d }%s\n", pgid_list[0], nsgid ? "," : "");
+    evbuffer_add_printf(req->buffer_out, "            \"pgid\": { \"id\": %d }%s\n", pgid_list[0], nsgid ? "," : "");
     }
-    evbuffer_add_printf(buf, "            \"sgid\": [\n");
+    evbuffer_add_printf(req->buffer_out, "            \"sgid\": [\n");
     for (i = 0; i < nsgid; i++) {
-        evbuffer_add_printf(buf, "                { \"id\": %d }%s\n", sgid_list[i], (i + 1) < nsgid ? "," : "" );
+        evbuffer_add_printf(req->buffer_out, "                { \"id\": %d }%s\n", sgid_list[i], (i + 1) < nsgid ? "," : "" );
     }
-    evbuffer_add_printf(buf, "                    ]\n");
+    evbuffer_add_printf(req->buffer_out, "                    ]\n");
 
-    evbuffer_add_printf(buf, "            }%s\n", poolindex ? "," : "");
+    evbuffer_add_printf(req->buffer_out, "            }%s\n", poolindex ? "," : "");
     if (poolindex) {
-        evbuffer_add_printf(buf, "        \"poolindex\": \"%s\"\n", poolindex);
+        evbuffer_add_printf(req->buffer_out, "        \"poolindex\": \"%s\"\n", poolindex);
     }
-    evbuffer_add_printf(buf, "        }\n");
-    evbuffer_add_printf(buf, "    }\n");
-    evbuffer_add_printf(buf, "}\n");
+    evbuffer_add_printf(req->buffer_out, "        }\n");
+    evbuffer_add_printf(req->buffer_out, "    }\n");
+    evbuffer_add_printf(req->buffer_out, "}\n");
+
+    evhtp_headers_add_header(req->headers_out,
+                             evhtp_header_new("Content-Type", "application/json", 0, 0));
 
     return 0;
 }

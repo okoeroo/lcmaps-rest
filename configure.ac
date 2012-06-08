@@ -38,13 +38,13 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.57)
-AC_INIT([LCMAPS REST Daemon], [0.0.1], okoeroo@gmail.com)
+AC_INIT([LCMAPS REST Daemon], [0.0.2], okoeroo@gmail.com)
 AC_CONFIG_MACRO_DIR([autodir])
 AM_INIT_AUTOMAKE([1.6.3 subdir-objects foreign])
 AC_CONFIG_SRCDIR([src/lcmapsd.h.in])
 
 # Notices.
-AC_COPYRIGHT([Copyright (c) 2011 of Oscar Koeroo
+AC_COPYRIGHT([Copyright (c) 2012 of Oscar Koeroo
 See LICENCE file for details
 ])
 AC_REVISION([$Revision: 1.28 $])
@@ -65,16 +65,10 @@ AC_PROG_LIBTOOL
 AM_PROG_CC_C_O
 AC_PROG_INSTALL
 
-# Checks for libraries.
-# dlopen library
-AC_CHECK_LIB([dl], [dlopen])
-
-AC_CHECK_LIB([crypto], [X509_get_subject_name])
-
 # Checks for header files.
 AC_HEADER_DIRENT
 AC_HEADER_STDC
-AC_CHECK_HEADERS([dlfcn.h malloc.h stdlib.h string.h syslog.h unistd.h utime.h values.h])
+AC_CHECK_HEADERS([lcmaps/lcmaps_openssl.h evhtp.h event2/bufferevent_ssl.h malloc.h stdlib.h string.h syslog.h unistd.h utime.h values.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
@@ -91,58 +85,24 @@ AC_FUNC_STAT
 AC_FUNC_UTIME_NULL
 AC_CHECK_FUNCS([setenv strchr strcspn strdup strerror strncasecmp strpbrk strspn strstr strtol utime])
 
+# Checks for libraries.
+# dlopen library
+#AC_CHECK_LIB([dl], [dlopen])
+
+AC_CHECK_LIB([crypto], [X509_get_subject_name],[],
+    [AC_MSG_FAILURE([no libcrypto found])])
+AC_CHECK_LIB([ssl], [SSL_library_init],[],
+    [AC_MSG_FAILURE([no libssl found])])
+AC_CHECK_LIB([event], [evbuffer_add_printf],[],
+    [AC_MSG_FAILURE([no libevent found])])
+AC_CHECK_LIB([event_openssl], [bufferevent_openssl_socket_new],[],
+    [AC_MSG_FAILURE([no libevent_openssl found])])
+AC_CHECK_LIB([evhtp], [evhtp_new],[],
+    [AC_MSG_FAILURE([no libevhtp found])],[-lpthread])
+
 # Set lcmaps variables
-AC_LCMAPS_INTERFACE([openssl])
-if test "x$have_lcmaps_globus_interface" = "xno" ; then
-    AC_MSG_FAILURE(["no LCMAPS globus interface found"])
-fi
-
-# Set compiled-in LCMAPS db file
-# relative paths are taken to be relative to $sysconfdir/lcmaps
-AC_ARG_WITH([lcmaps_db],
-    [AC_HELP_STRING([--with-lcmaps-db=FILE],
-		    [use specified FILE as lcmaps.db [default=SYSCONFDIR/lcmaps/lcmaps.db]])],
-    [AS_IF([test "x$withval" = "xyes" -o "x$withval" = "xno" ],
-	[AC_MSG_FAILURE([Option --with-lcmaps-db needs a filename])],
-	[AS_IF([test "x`echo $withval|cut -c1`" != "x/" ],
-  	    [LCMAPS_DB_FILE=$sysconfdir/lcmaps/$withval],
-  	    [LCMAPS_DB_FILE=$withval])])
-    ],
-    [LCMAPS_DB_FILE="$sysconfdir/lcmaps/lcmaps.db"]
-)
-
-AC_MSG_RESULT([LCMAPS_DB_FILE set to $LCMAPS_DB_FILE])
-AC_SUBST(LCMAPS_DB_FILE)
-AC_SUBST(LCMAPS_DB_DIR, [`dirname $LCMAPS_DB_FILE`])
-AC_SUBST(LCMAPS_DB_FILENAME, [`basename $LCMAPS_DB_FILE`])
-
-dnl allow the setting of a different path suffix for the LCMAPS plug-ins
-dnl Makefiles should set the plugindir to $MODULEDIR.
-AC_ARG_WITH([lcmaps_moduledir_sfx],
-    [AS_HELP_STRING([--with-lcmaps-moduledir-sfx=path],
-		    [Specify the install location of the LCMAPS plug-ins with respect to LIBDIR [default=/lcmaps]])],
-    [AS_IF([test "x`echo $withval|cut -c1`" != "x/" ],
-	[LCMAPS_MODULEDIR_SFX=/$withval],
-	[LCMAPS_MODULEDIR_SFX=$withval])],
-    [LCMAPS_MODULEDIR_SFX='/lcmaps']
-)
-AC_SUBST(LCMAPS_MODULEDIR_SFX)
-AC_MSG_RESULT([LCMAPS_MODULEDIR_SFX set to $LCMAPS_MODULEDIR_SFX])
-
-dnl allow the setting of a different path for the LCMAPS plug-ins
-dnl Makefiles should set the plugindir to $MODULEDIR.
-AC_ARG_WITH([lcmaps_moduledir],
-    [AS_HELP_STRING([--with-lcmaps-moduledir=path],
-		    [Specify the absolute install location of the LCMAPS plug-ins to be set in the LCMAPS_DB_FILE [default=LIBDIR/LCMAPS_MODULEDIR_SFX]])],
-    [AS_IF([test "x`echo $withval|cut -c1`" != "x/" ],
-	[AC_MSG_FAILURE([Option --with-lcmaps-moduledir needs an absolute directory])],
-	[AC_SUBST([LCMAPS_MODULEDIR], [$withval])])
-    ],
-    [AC_SUBST([LCMAPS_MODULEDIR], [${libdir}$LCMAPS_MODULEDIR_SFX])]
-)
-AC_MSG_RESULT([LCMAPS_MODULEDIR set to $LCMAPS_MODULEDIR])
-
-
+AC_CHECK_LIB([lcmaps], [lcmaps_init],[],
+    [AC_MSG_FAILURE([no liblcmaps found])])
 
 AC_SUBST(ADD_THESE_DEFINES)
 

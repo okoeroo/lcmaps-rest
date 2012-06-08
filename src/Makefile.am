@@ -47,12 +47,3 @@ lcmapsd_SOURCES = \
         main.c
 
 lcmapsd_CFLAGS = ${EXTRACOMPILEFLAGS}
-
-lcmapsd_LDFLAGS = /usr/lib/libcrypto.dylib /usr/lib/libssl.dylib /usr/local/lib/libevent.a  /usr/local/lib/libevent_openssl.a /usr/local/lib/libevhtp.a
-
-lcmapsd_LDADD = \
-    -lssl \
-    -lcrypto \
-    -levent_openssl \
-    -levhtp \
-    -llcmaps
