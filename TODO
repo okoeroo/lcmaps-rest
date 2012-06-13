@@ -10,3 +10,8 @@ Double identity aka pilot job support:
 --------------------------------------
 SSL + REST information, meaning double identity
 
+
+Rate limiter/pool mapping commiter:
+-----------------------------------
+Being able to rate limit mapping requests.
+Possibly by allowing endless mappings to occure, but being able to commit them or release them on PAM failure, for example.
