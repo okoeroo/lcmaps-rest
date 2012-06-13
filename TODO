@@ -1,0 +1,12 @@
+To do list:
+===========
+
+FQAN support:
+-------------
+Being able to push FQANs over the REST interface. 
+
+
+Double identity aka pilot job support:
+--------------------------------------
+SSL + REST information, meaning double identity
+
