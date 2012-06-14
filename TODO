@@ -14,4 +14,12 @@ SSL + REST information, meaning double identity
 Rate limiter/pool mapping commiter:
 -----------------------------------
 Being able to rate limit mapping requests.
-Possibly by allowing endless mappings to occure, but being able to commit them or release them on PAM failure, for example.
+Possibly by allowing endless mappings to occure, but being able to commit them
+or release them on PAM failure, for example.
+
+
+Sign response with private key of the LCMAPS-REST service
+---------------------------------------------------------
+Allows for caching of the data, while being able to verify that it originated
+from it in the first place. This safes you the entire LCMAPS step on a cache
+hit.
