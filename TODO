@@ -4,6 +4,8 @@ To do list:
 FQAN support:
 -------------
 Being able to push FQANs over the REST interface. 
+Proposal:
+    Send FQANs in the URI form: http://<uri>?subjectdn=<subject>&fqan=/dteam&fqan=/dteam/somegroup
 
 
 Double identity aka pilot job support:
@@ -23,3 +25,15 @@ Sign response with private key of the LCMAPS-REST service
 Allows for caching of the data, while being able to verify that it originated
 from it in the first place. This safes you the entire LCMAPS step on a cache
 hit.
+
+
+Back-map-feature
+----------------
+Implement backmapping from a different URI.
+Proposal:
+    -   Do this without LCMAPS.
+    -   When GET'ing a poolaccount name, return the subject DN from the
+        gridmapdir from the same inode (when mapped).  Alternatively when
+        pushing a subjectdn, lookup the gridmapdir's entry for this subjectdn
+        and return the poolaccount attached to the same inode.
+
